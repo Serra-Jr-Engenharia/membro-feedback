@@ -15,17 +15,46 @@ type FormStatus = 'idle' | 'loading' | 'success' | 'error';
 interface Member {
   id: string;
   name: string;
-  sector: string;
+  assessoria: string; // Trocamos 'sector' por 'assessoria'
 }
+
+// Interface para os membros agrupados
+interface GroupedMembers {
+  [key: string]: Member[];
+}
+
+// --- NOSSAS NOVAS DEFINIÇÕES DE AVALIAÇÃO ---
+
+// 1. Defina os aspectos (TBD)
+const evaluationAspects = [
+  { key: 'proatividade', label: 'Proatividade' },
+  { key: 'comunicacao', label: 'Comunicação' },
+  { key: 'tecnico', label: 'Conhecimento Técnico' },
+  { key: 'equipe', label: 'Trabalho em Equipe' },
+  { key: 'entregas', label: 'Qualidade/Prazo das Entregas' },
+];
+
+// 2. Mapeamento de notas para emotes
+const emojiMap: { [key: number]: string } = {
+  1: '😠', // Muito Ruim
+  2: '😕', // Ruim
+  3: '😐', // Regular
+  4: '🙂', // Bom
+  5: '😄', // Ótimo
+};
+
+// ----------------------------------------------
 
 export function EvaluationForm() {
   // Estados para os campos do formulário
   const [directorName, setDirectorName] = useState('');
   const [evaluationText, setEvaluationText] = useState('');
-  const [score, setScore] = useState<number | null>(null);
+  
+  // Novo estado para os critérios (ex: { proatividade: 5, comunicacao: 3 })
+  const [ratings, setRatings] = useState<{ [key: string]: number | null }>({});
 
   // Estados para a lista de membros vinda do Notion
-  const [members, setMembers] = useState<Member[]>([]);
+  const [groupedMembers, setGroupedMembers] = useState<GroupedMembers>({}); // Alterado
   const [selectedMember, setSelectedMember] = useState(''); // Armazena o NOME do membro
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   
@@ -33,7 +62,7 @@ export function EvaluationForm() {
   const [status, setStatus] = useState<FormStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // useEffect para buscar os membros da nossa API assim que o componente carregar
+  // useEffect para buscar os membros da nossa API (agora agrupados)
   useEffect(() => {
     const fetchMembers = async () => {
       try {
@@ -43,7 +72,8 @@ export function EvaluationForm() {
           throw new Error('Falha ao buscar dados');
         }
         const data = await response.json();
-        setMembers(data.members || []);
+        // Espera 'groupedMembers' da API atualizada
+        setGroupedMembers(data.groupedMembers || {}); 
       } catch (error) {
         console.error("Não foi possível carregar os membros", error);
         setErrorMessage("Erro ao carregar a lista de membros do Notion.");
@@ -52,7 +82,6 @@ export function EvaluationForm() {
       }
     };
 
-    // Chama a função de busca
     fetchMembers();
   }, []); // O array vazio [] garante que isso rode apenas uma vez
 
@@ -60,13 +89,10 @@ export function EvaluationForm() {
     event.preventDefault();
     
     // Validação
-    if (!directorName || !selectedMember || score === null) {
-      setErrorMessage('Por favor, preencha seu nome, selecione um membro e dê uma nota.');
-      setStatus('error');
-      return;
-    }
-    if (score < 0 || score > 10) {
-      setErrorMessage('A nota deve ser entre 0 e 10.');
+    const allAspectsRated = evaluationAspects.every(aspect => ratings[aspect.key] && ratings[aspect.key] > 0);
+
+    if (!directorName || !selectedMember || !allAspectsRated) {
+      setErrorMessage('Por favor, preencha seu nome, selecione um membro e avalie todos os critérios.');
       setStatus('error');
       return;
     }
@@ -75,12 +101,14 @@ export function EvaluationForm() {
     setErrorMessage('');
 
     // Inserir na tabela 'member_evaluations' do Supabase
+    // ATENÇÃO: Verifique se sua tabela no Supabase agora tem a coluna 'ratings' do tipo 'jsonb'
+    // e se você removeu a coluna antiga 'score'.
     const { error } = await supabase.from('member_evaluations').insert([
       { 
         director_name: directorName, 
-        member_name: selectedMember, // Salva o nome do membro que foi selecionado
+        member_name: selectedMember, 
         evaluation_text: evaluationText,
-        score: score,
+        ratings: ratings, // Salva o objeto JSON com todas as notas
       }
     ]);
 
@@ -95,11 +123,11 @@ export function EvaluationForm() {
       setDirectorName('');
       setSelectedMember('');
       setEvaluationText('');
-      setScore(null);
+      setRatings({}); // Limpa o estado dos ratings
     }
   };
 
-  // JSX para a tela de sucesso
+  // JSX para a tela de sucesso (sem alteração)
   if (status === 'success') {
     return ( 
       <Card className="w-full max-w-lg bg-gray-900/80 backdrop-blur-sm border-gray-700 text-white shadow-2xl rounded-2xl"> 
@@ -114,7 +142,7 @@ export function EvaluationForm() {
     );
   }
 
-  // JSX para o formulário principal
+  // JSX para o formulário principal (atualizado)
   return (
     <Card className="w-full max-w-2xl bg-gray-900/80 backdrop-blur-sm border-gray-700 text-white shadow-2xl rounded-2xl">
       <CardHeader className="text-center">
@@ -124,6 +152,8 @@ export function EvaluationForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-8">
+          
+          {/* --- SEÇÃO DE IDENTIFICAÇÃO --- */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="director-name">Seu Nome (Diretor)</Label>
@@ -137,14 +167,14 @@ export function EvaluationForm() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="member-name">Nome do Membro Avaliado</Label>
-              {/* Este é o <select> dinâmico que busca dados do Notion */}
+              {/* ATUALIZADO: <select> com <optgroup> */}
               <select
                 id="member-name"
                 value={selectedMember}
                 onChange={(e) => setSelectedMember(e.target.value)}
                 required
                 disabled={isLoadingMembers}
-                className={cn( // Usando cn() para aplicar estilos consistentes
+                className={cn( 
                   "border-input placeholder:text-muted-foreground dark:bg-input/30",
                   "flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs",
                   "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
@@ -154,11 +184,16 @@ export function EvaluationForm() {
                 <option value="" disabled>
                   {isLoadingMembers ? 'Carregando membros...' : 'Selecione um membro'}
                 </option>
-                {/* Mapeia a lista de membros para criar as opções */}
-                {members.map((member) => (
-                  <option key={member.id} value={member.name}>
-                    {member.name} ({member.sector})
-                  </option>
+                {/* Mapeia as chaves (Assessorias) para criar <optgroup> */}
+                {Object.keys(groupedMembers).sort().map((assessoria) => (
+                  <optgroup key={assessoria} label={assessoria}>
+                    {/* Mapeia os membros dentro de cada assessoria */}
+                    {groupedMembers[assessoria].map((member) => (
+                      <option key={member.id} value={member.name}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -166,30 +201,45 @@ export function EvaluationForm() {
 
           <hr className="border-gray-700/50" />
 
-          <div className="space-y-2">
-            <Label htmlFor="score">Nota (0 a 10)</Label>
-            <Input 
-              id="score" 
-              type="number" 
-              min="0" 
-              max="10" 
-              step="0.5" // Permite notas como 8.5
-              value={score ?? ''} 
-              onChange={(e) => setScore(e.target.value === '' ? null : Number(e.target.value))} 
-              required 
-              placeholder="Digite uma nota de 0 a 10"
-            />
+          {/* --- SEÇÃO DE AVALIAÇÃO (EMOTES) --- */}
+          <div className="space-y-6">
+            <Label className="text-lg font-medium">Avaliação por Critérios</Label>
+            
+            {evaluationAspects.map((aspect) => (
+              <div key={aspect.key} className="space-y-3">
+                <Label htmlFor={aspect.key} className="text-base">{aspect.label}</Label>
+                {/* Container para os botões de emote */}
+                <div className="flex space-x-2 sm:space-x-3">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <Button
+                      type="button"
+                      key={value}
+                      variant={ratings[aspect.key] === value ? 'default' : 'outline'}
+                      onClick={() => setRatings(prev => ({ ...prev, [aspect.key]: value }))}
+                      className={cn(
+                        "flex-1 text-2xl h-12 transition-all transform",
+                        ratings[aspect.key] === value ? "scale-110" : "scale-100 opacity-70 hover:opacity-100"
+                      )}
+                    >
+                      {emojiMap[value]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           <hr className="border-gray-700/50" /> 
           
+          {/* --- SEÇÃO DE COMENTÁRIOS --- */}
           <div className="space-y-2">
             <Label htmlFor="feedback">Comentário sobre o desempenho</Label>
             <Textarea 
               id="feedback" 
               value={evaluationText} 
               onChange={(e) => setEvaluationText(e.target.value)} 
-              placeholder="Descreva os pontos fortes, pontos a melhorar, etc." 
+              placeholder="Descreva os pontos fortes, pontos a melhorar, etc."
+              rows={4}
             />
           </div>
           
