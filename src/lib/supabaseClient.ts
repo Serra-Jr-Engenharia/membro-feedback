@@ -11,4 +11,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("ERRO CRÍTICO: Variáveis VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não estão definidas no .env. Você reiniciou o servidor (npm run dev)?")
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false 
+  }
+})

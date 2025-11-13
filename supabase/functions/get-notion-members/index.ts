@@ -25,40 +25,43 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-  
-  const { sector } = await req.json()
-  if (!sector) {
-    return new Response(JSON.stringify({ error: 'Setor é obrigatório' }), {
+
+const { assessoria, exclude_name } = await req.json()
+  if (!assessoria) {
+    return new Response(JSON.stringify({ error: 'Assessoria é obrigatória' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  console.log(`Buscando membros para o setor: ${sector}`)
+  console.log(`Buscando membros da Assessoria: ${assessoria}, excluindo: ${exclude_name}`)
 
   try {
     const response = await notion.databases.query({
       database_id: DATABASE_ID,
-      
       filter: {
-        property: 'Assessoria', 
+        property: 'Assessoria', // Filtra pela assessoria
         multi_select: {
-          contains: sector, 
+          contains: assessoria,
         },
       },
     })
 
-    const members = response.results.map((page: any) => {
+    const allMembers = response.results.map((page: any) => {
+      // (Confirme se a coluna de nome é "Nome")
       return page.properties.Nome.title[0].plain_text 
     })
 
-    console.log(`Encontrados ${members.length} membros.`)
+    // 2. Filtra a lista para excluir o próprio Gestor/Diretor
+    const filteredMembers = allMembers.filter(name => name !== exclude_name)
 
-    return new Response(JSON.stringify({ members }), {
+    console.log(`Encontrados ${filteredMembers.length} membros.`)
+
+    return new Response(JSON.stringify({ members: filteredMembers }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    console.error('Erro ao buscar Notion:', error)
+    console.error('Erro ao buscar Notion:', error) 
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

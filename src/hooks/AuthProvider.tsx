@@ -1,53 +1,85 @@
-import { useState, createContext, useContext } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
-import { directorLogins } from '../lib/userDatabase'
-import type { DirectorProfile } from '../lib/userDatabase.ts'
-import { Navigate } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
+import type { Session, User } from '@supabase/supabase-js'
 
-// 1. Definir o que o nosso Contexto vai fornecer
-interface AuthContextType {
-  profile: DirectorProfile | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+export interface Profile {
+  id: string;
+  notion_name: string;
+  user_role: string;
+  project_name: string | null;
+  assessoria: string;
 }
-
-// 2. Criar o Contexto
+interface AuthContextType {
+  session: Session | null
+  user: User | null
+  profile: Profile | null
+  loading: boolean
+}
 const AuthContext = createContext<AuthContextType>(null!)
 
-// 3. Criar o Provedor
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // O único estado que importa: quem está logado
-  const [profile, setProfile] = useState<DirectorProfile | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true); // Começa como true
 
-  // Função de Login
-  const login = async (email: string, password: string) => {
-    // Procura o usuário no nosso arquivo "hardcoded"
-    const foundUser = directorLogins.find(
-      (user) => user.email === email
+  useEffect(() => {
+    console.log('AuthProvider (v5 - Deadlock Fix): Configurando listener...')
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      
+      (event, session) => {
+        console.log(`AuthProvider: Evento: ${event}`)
+        
+        setSession(session)
+        setUser(session?.user ?? null)
+        setProfile(null); 
+
+        setTimeout(async () => {
+          try {
+            if (session?.user) {
+              console.log(`AuthProvider: Buscando perfil (ID: ${session.user.id})`)
+
+              const { data: profileData, error } = await supabase
+                .from('profiles')
+                .select('id, notion_name, user_role, project_name, assessoria')
+                .eq('id', session.user.id)
+                .limit(1)
+                .maybeSingle(); 
+
+              if (error) {
+                console.error('ERRO AO BUSCAR PERFIL:', error.message)
+              }
+              
+              setProfile(profileData as Profile ?? null)
+              console.log('AuthProvider: Perfil recebido:', profileData)
+
+            } else {
+              console.log('AuthProvider: Perfil limpo (sem sessão).')
+            }
+
+          } catch (error) {
+              console.error('AuthProvider: Erro inesperado:', error)
+          } finally {
+              setLoading(false)
+              console.log('AuthProvider: Carregamento finalizado.')
+          }
+        }, 0) 
+      }
     )
 
-    // Verifica a senha
-    if (foundUser && foundUser.password === password) {
-      setProfile(foundUser) // Login com sucesso!
-      return; // Sucesso
+    return () => {
+      console.log('AuthProvider: Limpando listener.')
+      authListener.subscription.unsubscribe()
     }
+  }, [])
 
-    // Falha no login
-    throw new Error('Email ou senha inválidos.')
-  }
-
-  // Função de Logout
-  const logout = () => {
-    setProfile(null) // Simplesmente limpa o perfil
-  }
-
-  // O 'value' agora fornece o perfil e as funções de login/logout
   return (
-    <AuthContext.Provider value={{ profile, login, logout }}>
-      {children}
+    <AuthContext.Provider value={{ session, user, profile, loading }}>
+      {!loading && children}
     </AuthContext.Provider>
   )
 }
 
-// 4. O Hook (para usar nas páginas)
 export const useAuth = () => useContext(AuthContext)

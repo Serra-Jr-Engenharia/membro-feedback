@@ -6,10 +6,18 @@ type ProtectedRouteProps = {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { profile } = useAuth()
+  const { session, loading } = useAuth()
   const location = useLocation()
 
-  if (!profile) {
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        Carregando...
+      </div>
+    )
+  }
+
+  if (!session) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
