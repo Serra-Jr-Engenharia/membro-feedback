@@ -25,7 +25,7 @@ export default function StarRating({ rating, setRating }: StarRatingProps) {
             />
             <FaStar
               size={25}
-              className={starValue <= (hover || rating) ? 'text-[#FF6600]' : 'text-gray-500'}
+              className={starValue <= (hover || rating) ? 'text-laranja' : 'text-gray-500'}
               onMouseEnter={() => setHover(starValue)}
               onMouseLeave={() => setHover(0)}
             />

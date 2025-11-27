@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+@theme {
+  --color-azulEscuroPage: #000D1A; /* background Page */
+  --color-azulEscuroCard: #001429; /* background Card */
+
+  --color-azulClaroCheck: #0DB4E0; /* + claro */
+  --color-azulClaroBorder: #05A4CC; /* + escuro */
+
+  --color-laranja: #FF6600;
+
+  --font-poppins: "Poppins", sans-serif;
+}
