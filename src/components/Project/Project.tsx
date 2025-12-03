@@ -10,6 +10,7 @@ interface ProjectProps {
   membros: string[];
   evaluate: (value: string | null) => void;
   submit: () => void;
+  loading?: boolean;
 }
 
 export default function Project({
@@ -17,6 +18,7 @@ export default function Project({
   membros,
   evaluate,
   submit,
+  loading = false,
 }: ProjectProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "start",
@@ -39,7 +41,7 @@ export default function Project({
       <hr className="bg-laranja w-[350px] h-0.5 border-none outline-0" />
 
       <div className="flex gap-4 items-center">
-        <button type="button" onClick={scrollPrev} className="p-2 rounded-full">
+        <button type="button" onClick={scrollPrev} className="p-2 rounded-full hover:bg-white/10 transition-colors">
           <img
             src={arrowIcon}
             className="max-h-[22px] max-w-[15px] cursor-pointer"
@@ -63,7 +65,7 @@ export default function Project({
           </div>
         </div>
 
-        <button type="button" onClick={scrollNext} className="p-2 rounded-full">
+        <button type="button" onClick={scrollNext} className="p-2 rounded-full hover:bg-white/10 transition-colors">
           <img
             src={arrowIcon}
             className="max-h-[22px] max-w-[15px] cursor-pointer rotate-180"
@@ -72,8 +74,11 @@ export default function Project({
         </button>
 
         <div className="flex flex-col gap-2">
+          {/* Botão de Review (tipo 1) não precisa de loading */}
           <Button tipo={1} submit={submit} />
-          <Button tipo={0} submit={submit} />
+          
+          {/* Botão de Enviar (tipo 0) recebe o loading */}
+          <Button tipo={0} submit={submit} loading={loading} />
         </div>
       </div>
     </div>

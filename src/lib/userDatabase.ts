@@ -1,15 +1,11 @@
-// src/lib/userDatabase.ts
-
-// Esta é a interface do nosso "Perfil"
 export interface DirectorProfile {
   id: string; 
   email: string;
-  password: string; // <-- CORRIGIDO AQUI (era um ponto e vírgula)
+  password: string; 
   full_name: string;
   sector: string; 
 }
 
-// ESTE É O SEU NOVO "BANCO DE DADOS" DE LOGINS
 export const directorLogins: DirectorProfile[] = [
   {
     id: 'dir_carlos',
@@ -25,5 +21,4 @@ export const directorLogins: DirectorProfile[] = [
     full_name: 'Ana Diretora',
     sector: 'Marketing',
   },
-  // Adicione quantos diretores precisar
 ]

@@ -2,7 +2,7 @@ import userIcon from '../../assets/userIcon.svg'
 
 interface UserProps {
   nome: string
-  pfp?: string // pfp -> profile picture
+  pfp?: string 
   evaluate: () => void
 }
 
