@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { Link, useNavigate } from 'react-router-dom'
 
 const assessorias = [
-  'Computação', 'Mecânica', 'SerraLab', 'Comercial', 'Marketing'
+  'Computação', 'Mecânica', 'SerraLab', 'Comercial', 'Marketing', 'Recursos Humanos'
 ]
 
 export default function SignUp() {

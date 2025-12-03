@@ -7,7 +7,7 @@ import { useAuth } from '../hooks/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaFilter } from 'react-icons/fa';
 
-const assessorias = ['Todas', 'Computação', 'Mecânica', 'SerraLab', 'Comercial', 'Marketing'];
+const assessorias = ['Todas', 'Computação', 'Mecânica', 'SerraLab', 'Comercial', 'Marketing', 'Recursos Humanos'];
 const roles = ['Todos', 'Membro', 'Gestor', 'Diretor'];
 
 export default function Analytics() {
