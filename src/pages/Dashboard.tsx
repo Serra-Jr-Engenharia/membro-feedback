@@ -6,6 +6,7 @@ import type { EvaluationFormData } from "../components/EvaluationModal";
 import Header from "../components/Header";
 import Project from "../components/Project/Project";
 import StatusEvaluation from "../components/StatusEvaluation";
+import { useNavigate } from "react-router-dom";
 
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 
@@ -13,6 +14,7 @@ type ViewMode = 'team' | 'director';
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
+  const navigate = useNavigate();
   
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [directors, setDirectors] = useState<string[]>([]);
@@ -86,6 +88,7 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    navigate('/login');
   };
 
   const handleDeleteAccount = async () => {
@@ -99,6 +102,7 @@ export default function Dashboard() {
       if (error) throw error;
       alert("Sua conta foi excluída com sucesso.");
       await supabase.auth.signOut();
+      navigate('/login');
     } catch (err: any) {
       console.error("Erro:", err);
       alert("Erro ao excluir conta: " + (err.message || "Erro desconhecido"));
