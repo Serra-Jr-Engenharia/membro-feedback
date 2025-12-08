@@ -16,15 +16,19 @@ interface EvaluationRow {
   is_destaque: boolean;
   text_delegacao?: string;
   
+  // Join com profiles para saber quem avaliou
   profiles: { notion_name: string; user_role: string } | null;
   
+  // Todas as Notas possíveis
   rating_comunicacao: number;
   rating_proatividade: number;
   
+  // Específicas de Membro
   rating_participacao?: number;
   rating_relacao_grupo?: number;
   rating_entrega_metas?: number;
   
+  // Específicas de Diretor
   rating_lideranca?: number;
   rating_flexibilidade?: number;
 }
@@ -56,16 +60,18 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="bg-[#001429] border border-[#001A33] w-full max-w-4xl h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden">
         
+        {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-[#001A33] bg-[#000D1A]">
           <div>
             <h2 className="text-2xl font-bold text-white">Histórico Detalhado</h2>
             <p className="text-[#FF6600] font-medium text-lg">{memberName}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors cursor-pointer">
             <FaTimes size={24} />
           </button>
         </div>
 
+        {/* Lista de Avaliações */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {loading ? (
             <div className="flex justify-center items-center h-full">
@@ -80,6 +86,7 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
             evaluations.map((item) => (
               <div key={item.id} className="bg-[#000D1A] border border-[#001A33] rounded-lg p-5 hover:border-[#FF6600]/30 transition-all shadow-md">
                 
+                {/* Cabeçalho do Card (Quem avaliou + Data) */}
                 <div className="flex justify-between items-start mb-4 pb-3 border-b border-[#001A33]/50">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[#001A33] flex items-center justify-center text-sm font-bold text-gray-300 border border-[#001A33]">
@@ -109,22 +116,29 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
                   </div>
                 </div>
 
+                {/* Comentário */}
                 {item.comments && (
                   <div className="flex gap-3 mb-5 bg-[#001429] p-3 rounded-lg border border-[#001A33]/50">
                     <FaQuoteLeft className="text-[#FF6600] text-opacity-40 min-w-[14px] mt-0.5" />
-                    <p className="text-gray-300 text-sm italic leading-relaxed">{item.comments}</p>
+                    <p className="text-gray-300 text-sm italic leading-relaxed whitespace-pre-wrap">
+                      {item.comments}
+                    </p>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {/* Grid de Notas (Agora com TODAS as métricas) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                    
+                   {/* Métricas Comuns (Sempre aparecem) */}
                    <ScoreChip label="Comunicação" val={item.rating_comunicacao} />
                    <ScoreChip label="Proatividade" val={item.rating_proatividade} />
 
+                   {/* Lógica Condicional para os outros campos */}
                    {item.evaluation_type === 'director' ? (
                      <>
                         <ScoreChip label="Liderança" val={item.rating_lideranca} />
                         <ScoreChip label="Flexibilidade" val={item.rating_flexibilidade} />
+                        
                         {item.text_delegacao && (
                             <div className="flex items-center justify-between bg-[#001429] px-3 py-2 rounded border border-[#001A33]">
                                 <span className="text-xs text-gray-500">Delega:</span>
@@ -135,10 +149,11 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
                         )}
                      </>
                    ) : (
+                     /* Métricas de Membro (ADICIONADAS AQUI) */
                      <>
                         <ScoreChip label="Participação" val={item.rating_participacao} />
                         <ScoreChip label="Relação Grupo" val={item.rating_relacao_grupo} />
-                        <ScoreChip label="Entrega Metas" val={item.rating_entrega_metas} />
+                        <ScoreChip label="Metas" val={item.rating_entrega_metas} />
                      </>
                    )}
                 </div>
@@ -152,14 +167,17 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
   );
 }
 
+// Componente visual da nota (Estrelinha)
 const ScoreChip = ({ label, val }: { label: string, val?: number }) => {
-  if (val === undefined || val === null) return null;
+  // Se o valor for 0, undefined ou null, não renderiza nada para não poluir
+  if (!val) return null;
   
+  // Cor dinâmica baseada na nota (Verde > 4, Amarelo = 3, Vermelho < 3)
   const valueColor = val >= 4 ? 'text-green-400' : val >= 3 ? 'text-yellow-400' : 'text-red-400';
 
   return (
     <div className="flex items-center justify-between bg-[#001429] px-3 py-2 rounded border border-[#001A33]">
-      <span className="text-xs text-gray-500 truncate mr-2">{label}</span>
+      <span className="text-xs text-gray-500 truncate mr-2" title={label}>{label}:</span>
       <span className={`${valueColor} font-bold text-sm flex items-center gap-1`}>
         {val} <FaStar size={10} className="text-yellow-600/50" />
       </span>
