@@ -129,13 +129,17 @@ export default function Analytics() {
         ) : filteredData.length === 0 ? (
             <div className="text-center text-gray-500 mt-20">Nenhum membro encontrado com estes filtros.</div>
         ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredData.map(item => (
-                    <div key={item.profile_id} onClick={() => setSelectedMember(item.member_name)} className="cursor-pointer">
-                        <AnalyticsCard data={item} />
-                    </div>
-                ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredData.map(item => (
+                <div 
+                  key={item.member_name} 
+                  onClick={() => setSelectedMember(item.member_name)} 
+                  className="cursor-pointer"
+                  >
+                  <AnalyticsCard data={item} />
+                </div>
+             ))}
+          </div>
         )}
       </div>
 
