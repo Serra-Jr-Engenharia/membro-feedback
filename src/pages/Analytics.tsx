@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import Header from '../components/Header';
 import AnalyticsCard from '../components/AnalyticsCard';
 import type { AnalyticsData } from '../components/AnalyticsCard';
+import AnalyticsDetailsModal from '../components/AnalyticsDetailsModal';
 import { useAuth } from '../hooks/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaFilter } from 'react-icons/fa';
@@ -17,14 +18,19 @@ export default function Analytics() {
   const [data, setData] = useState<AnalyticsData[]>([]);
   const [loading, setLoading] = useState(true);
   
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('Todos');
   const [filterAssessoria, setFilterAssessoria] = useState('Todas');
 
   useEffect(() => {
-    if (profile && profile.user_role !== 'Diretor') {
-        alert("Acesso restrito a Diretores.");
+    const isAllowed = profile && (profile.user_role === 'Diretor' || profile.assessoria === 'Recursos Humanos');
+
+    if (profile && !isAllowed) {
+        alert("Acesso restrito ao RH e Diretoria.");
         navigate('/');
+        return;
     }
 
     const fetchData = async () => {
@@ -41,11 +47,16 @@ export default function Analytics() {
       setLoading(false);
     };
 
-    if (profile) fetchData();
+    if (profile && isAllowed) fetchData();
   }, [profile, navigate]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    navigate('/login');
+  };
+
+  const handleDeleteAccount = async () => {
+    alert("Para excluir a conta, acesse o Dashboard.");
   };
 
   const filteredData = data.filter(item => {
@@ -64,7 +75,7 @@ export default function Analytics() {
         <Header 
             nome={profile.notion_name} 
             logout={handleLogout} 
-            deleteAccount={() => {}} // Função vazia pois não é o foco aqui
+            deleteAccount={handleDeleteAccount}
         />
 
         <div className="mt-8 mb-8">
@@ -81,7 +92,7 @@ export default function Analytics() {
                         placeholder="Buscar membro por nome..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-[#000D1A] border border-[#001A33] rounded-lg text-white focus:border-[#FF6600] outline-none transition-colors"
+                        className="w-full pl-10 pr-4 py-2 bg-[#000D1A] border border-[#001A33] rounded-lg text-white focus:border-[#FF6600] outline-none transition-colors placeholder-gray-600"
                     />
                 </div>
 
@@ -120,11 +131,21 @@ export default function Analytics() {
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredData.map(item => (
-                    <AnalyticsCard key={item.profile_id} data={item} />
+                    <div key={item.profile_id} onClick={() => setSelectedMember(item.member_name)} className="cursor-pointer">
+                        <AnalyticsCard data={item} />
+                    </div>
                 ))}
             </div>
         )}
       </div>
+
+      {/* Modal de Detalhes (Histórico) */}
+      {selectedMember && (
+        <AnalyticsDetailsModal 
+            memberName={selectedMember} 
+            onClose={() => setSelectedMember(null)} 
+        />
+      )}
     </div>
   );
 }

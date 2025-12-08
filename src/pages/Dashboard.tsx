@@ -264,13 +264,14 @@ export default function Dashboard() {
       />
 
       {evaluatingMember && (
-        <EvaluationModal
-          memberName={evaluatingMember}
-          initialData={pendingEvaluations.get(evaluatingMember)}
-          onClose={() => setEvaluatingMember(null)}
-          onSubmit={handleSaveEvaluation}
-        />
-      )}
+  <EvaluationModal
+    memberName={evaluatingMember}
+    evaluationType={directors.includes(evaluatingMember) ? 'director' : 'member'}
+    initialData={pendingEvaluations.get(evaluatingMember)}
+    onClose={() => setEvaluatingMember(null)}
+    onSubmit={handleSaveEvaluation}
+  />
+)}
     </div>
   );
 }
