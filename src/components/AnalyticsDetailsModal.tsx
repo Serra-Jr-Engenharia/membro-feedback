@@ -13,7 +13,7 @@ interface EvaluationRow {
   week_of: string;
   comments: string;
   evaluation_type: string;
-  profiles: { full_name: string; user_role: string } | null;
+  profiles: { notion_name: string; user_role: string } | null;
   rating_comunicacao: number;
   rating_participacao?: number;
   rating_lideranca?: number;
@@ -29,7 +29,7 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
         .from("evaluations")
         .select(`
           *,
-          profiles:director_id ( full_name, user_role )
+          profiles:director_id ( notion_name, user_role )
         `)
         .eq("member_name", memberName)
         .order("created_at", { ascending: false });
@@ -69,10 +69,10 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-[#001A33] flex items-center justify-center text-xs font-bold text-gray-300">
-                      {item.profiles?.full_name?.charAt(0) || "?"}
+                      {item.profiles?.notion_name?.charAt(0) || "?"}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-white">{item.profiles?.full_name || "Anônimo"}</p>
+                      <p className="text-sm font-bold text-white">{item.profiles?.notion_name || "Anônimo"}</p>
                       <p className="text-xs text-gray-500">{item.profiles?.user_role} • Semana: {item.week_of}</p>
                     </div>
                   </div>
@@ -89,18 +89,15 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
                   </div>
                 )}
 
-                {/* Resumo das Notas (Chips) */}
                 <div className="flex flex-wrap gap-2">
                    <ScoreChip label="Comunicação" val={item.rating_comunicacao} />
                    {item.evaluation_type === 'director' ? (
                      <>
                         <ScoreChip label="Liderança" val={item.rating_lideranca} />
-                        {/* Outros campos de líder aqui se quiser */}
                      </>
                    ) : (
                      <>
                         <ScoreChip label="Participação" val={item.rating_participacao} />
-                        {/* Outros campos de membro aqui se quiser */}
                      </>
                    )}
                 </div>
