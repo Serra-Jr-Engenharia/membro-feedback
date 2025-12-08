@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { FaTimes, FaStar, FaQuoteLeft, FaTrophy, FaUserCheck } from "react-icons/fa";
+import { FaTimes, FaStar, FaQuoteLeft, FaTrophy } from "react-icons/fa";
 
 interface DetailProps {
   memberName: string;
