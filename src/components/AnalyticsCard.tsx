@@ -13,6 +13,8 @@ export interface AnalyticsData {
   avg_relacao: number;
   avg_proatividade: number;
   avg_metas: number;
+  avg_lideranca: number;
+  avg_flexibilidade: number;
 }
 
 const StatBar = ({ label, value }: { label: string; value: number }) => (
@@ -67,10 +69,16 @@ export default function AnalyticsCard({ data }: { data: AnalyticsData }) {
       {/* Estatísticas Detalhadas */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         <StatBar label="Comunicação" value={data.avg_comunicacao} />
-        <StatBar label="Participação" value={data.avg_participacao} />
-        <StatBar label="Relação" value={data.avg_relacao} />
         <StatBar label="Proatividade" value={data.avg_proatividade} />
-        <StatBar label="Metas" value={data.avg_metas} />
+        
+        {/* Mostra métricas de membro se tiverem valor > 0 */}
+        {data.avg_participacao > 0 && <StatBar label="Participação" value={data.avg_participacao} />}
+        {data.avg_relacao > 0 && <StatBar label="Relação" value={data.avg_relacao} />}
+        {data.avg_metas > 0 && <StatBar label="Metas" value={data.avg_metas} />}
+
+        {/* Mostra métricas de líder se tiverem valor > 0 */}
+        {data.avg_lideranca > 0 && <StatBar label="Liderança" value={data.avg_lideranca} />}
+        {data.avg_flexibilidade > 0 && <StatBar label="Flexibilidade" value={data.avg_flexibilidade} />}
       </div>
     </div>
   );
