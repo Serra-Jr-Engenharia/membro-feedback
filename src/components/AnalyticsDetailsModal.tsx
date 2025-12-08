@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { FaTimes, FaStar, FaQuoteLeft } from "react-icons/fa";
+import { FaTimes, FaStar, FaQuoteLeft, FaTrophy, FaUserCheck } from "react-icons/fa";
 
 interface DetailProps {
   memberName: string;
@@ -13,10 +13,20 @@ interface EvaluationRow {
   week_of: string;
   comments: string;
   evaluation_type: string;
+  is_destaque: boolean;
+  text_delegacao?: string;
+  
   profiles: { notion_name: string; user_role: string } | null;
+  
   rating_comunicacao: number;
+  rating_proatividade: number;
+  
   rating_participacao?: number;
+  rating_relacao_grupo?: number;
+  rating_entrega_metas?: number;
+  
   rating_lideranca?: number;
+  rating_flexibilidade?: number;
 }
 
 export default function AnalyticsDetailsModal({ memberName, onClose }: DetailProps) {
@@ -46,61 +56,93 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="bg-[#001429] border border-[#001A33] w-full max-w-4xl h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden">
         
-        {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-[#001A33] bg-[#000D1A]">
           <div>
-            <h2 className="text-2xl font-bold text-white">Histórico de Feedbacks</h2>
-            <p className="text-[#FF6600] font-medium">{memberName}</p>
+            <h2 className="text-2xl font-bold text-white">Histórico Detalhado</h2>
+            <p className="text-[#FF6600] font-medium text-lg">{memberName}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <FaTimes size={24} />
           </button>
         </div>
 
-        {/* Lista */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {loading ? (
-            <p className="text-center text-gray-500 mt-10">Carregando histórico...</p>
+            <div className="flex justify-center items-center h-full">
+                <p className="text-gray-500 animate-pulse">Carregando histórico...</p>
+            </div>
           ) : evaluations.length === 0 ? (
-            <p className="text-center text-gray-500 mt-10">Nenhuma avaliação encontrada.</p>
+            <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
+                <FaQuoteLeft className="text-4xl opacity-20" />
+                <p>Nenhuma avaliação encontrada.</p>
+            </div>
           ) : (
             evaluations.map((item) => (
-              <div key={item.id} className="bg-[#000D1A] border border-[#001A33] rounded-lg p-5 hover:border-[#FF6600]/30 transition-colors">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#001A33] flex items-center justify-center text-xs font-bold text-gray-300">
+              <div key={item.id} className="bg-[#000D1A] border border-[#001A33] rounded-lg p-5 hover:border-[#FF6600]/30 transition-all shadow-md">
+                
+                <div className="flex justify-between items-start mb-4 pb-3 border-b border-[#001A33]/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#001A33] flex items-center justify-center text-sm font-bold text-gray-300 border border-[#001A33]">
                       {item.profiles?.notion_name?.charAt(0) || "?"}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-white">{item.profiles?.notion_name || "Anônimo"}</p>
-                      <p className="text-xs text-gray-500">{item.profiles?.user_role} • Semana: {item.week_of}</p>
+                      <p className="text-sm font-bold text-white">{item.profiles?.notion_name || "Usuário Removido"}</p>
+                      <p className="text-xs text-gray-500">
+                        {item.profiles?.user_role || "Cargo Desconhecido"} • {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                      </p>
                     </div>
                   </div>
-                  <span className="text-xs px-2 py-1 rounded bg-[#001A33] text-gray-400 border border-[#001429]">
-                    {item.evaluation_type === 'director' ? 'Liderança' : 'Membro'}
-                  </span>
+                  
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-[10px] px-2 py-0.5 rounded border ${
+                        item.evaluation_type === 'director' 
+                        ? 'bg-purple-900/20 text-purple-400 border-purple-900/50' 
+                        : 'bg-blue-900/20 text-blue-400 border-blue-900/50'
+                    }`}>
+                        {item.evaluation_type === 'director' ? 'Liderança' : 'Membro'}
+                    </span>
+                    {item.is_destaque && (
+                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-yellow-900/20 text-yellow-500 border border-yellow-900/50 font-bold">
+                            <FaTrophy size={8} /> Destaque
+                        </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Comentário */}
                 {item.comments && (
-                  <div className="flex gap-3 mb-4">
-                    <FaQuoteLeft className="text-[#FF6600] text-opacity-40 min-w-[12px] mt-1" />
-                    <p className="text-gray-300 text-sm italic">{item.comments}</p>
+                  <div className="flex gap-3 mb-5 bg-[#001429] p-3 rounded-lg border border-[#001A33]/50">
+                    <FaQuoteLeft className="text-[#FF6600] text-opacity-40 min-w-[14px] mt-0.5" />
+                    <p className="text-gray-300 text-sm italic leading-relaxed">{item.comments}</p>
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                   
                    <ScoreChip label="Comunicação" val={item.rating_comunicacao} />
+                   <ScoreChip label="Proatividade" val={item.rating_proatividade} />
+
                    {item.evaluation_type === 'director' ? (
                      <>
                         <ScoreChip label="Liderança" val={item.rating_lideranca} />
+                        <ScoreChip label="Flexibilidade" val={item.rating_flexibilidade} />
+                        {item.text_delegacao && (
+                            <div className="flex items-center justify-between bg-[#001429] px-3 py-2 rounded border border-[#001A33]">
+                                <span className="text-xs text-gray-500">Delega:</span>
+                                <span className="text-xs font-bold text-white bg-[#000D1A] px-2 py-0.5 rounded border border-[#001A33]">
+                                    {item.text_delegacao}
+                                </span>
+                            </div>
+                        )}
                      </>
                    ) : (
                      <>
                         <ScoreChip label="Participação" val={item.rating_participacao} />
+                        <ScoreChip label="Relação Grupo" val={item.rating_relacao_grupo} />
+                        <ScoreChip label="Entrega Metas" val={item.rating_entrega_metas} />
                      </>
                    )}
                 </div>
+
               </div>
             ))
           )}
@@ -111,12 +153,15 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
 }
 
 const ScoreChip = ({ label, val }: { label: string, val?: number }) => {
-  if (!val) return null;
+  if (val === undefined || val === null) return null;
+  
+  const valueColor = val >= 4 ? 'text-green-400' : val >= 3 ? 'text-yellow-400' : 'text-red-400';
+
   return (
-    <div className="flex items-center gap-1 bg-[#001429] px-2 py-1 rounded text-xs text-gray-400 border border-[#001A33]">
-      <span>{label}:</span>
-      <span className="text-[#FF6600] font-bold flex items-center gap-1">
-        {val} <FaStar size={8} />
+    <div className="flex items-center justify-between bg-[#001429] px-3 py-2 rounded border border-[#001A33]">
+      <span className="text-xs text-gray-500 truncate mr-2">{label}</span>
+      <span className={`${valueColor} font-bold text-sm flex items-center gap-1`}>
+        {val} <FaStar size={10} className="text-yellow-600/50" />
       </span>
     </div>
   )
