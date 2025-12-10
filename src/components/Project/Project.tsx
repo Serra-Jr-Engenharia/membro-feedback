@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-
+import { FaPen } from "react-icons/fa";
 import arrowIcon from "../../assets/left.svg";
 import Card from "./Card";
 import Button from "./Button";
@@ -11,6 +11,7 @@ interface ProjectProps {
   evaluate: (value: string | null) => void;
   submit: () => void;
   loading?: boolean;
+  onEditTitle?: () => void;
 }
 
 export default function Project({
@@ -19,6 +20,7 @@ export default function Project({
   evaluate,
   submit,
   loading = false,
+  onEditTitle,
 }: ProjectProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "start",
@@ -37,7 +39,20 @@ export default function Project({
 
   return (
     <div className="flex flex-col font-poppins text-white font-medium text-2xl gap-1 pt-10">
-      <h2 className="text-white">{nome || "Projeto"}</h2>
+      
+      <div className="flex items-center gap-3 group">
+        <h2 className="text-white">{nome || "Projeto"}</h2> 
+        {onEditTitle && (
+          <button 
+            onClick={onEditTitle}
+            className="text-gray-500 hover:text-laranja transition-colors text-lg opacity-0 group-hover:opacity-100 p-1"
+            title="Alterar nome do projeto"
+          >
+            <FaPen />
+          </button>
+        )}
+      </div>
+      
       <hr className="bg-laranja w-[350px] h-0.5 border-none outline-0" />
 
       <div className="flex gap-4 items-center">
@@ -74,10 +89,7 @@ export default function Project({
         </button>
 
         <div className="flex flex-col gap-2">
-          {/* Botão de Review (tipo 1) não precisa de loading */}
           <Button tipo={1} submit={submit} />
-          
-          {/* Botão de Enviar (tipo 0) recebe o loading */}
           <Button tipo={0} submit={submit} loading={loading} />
         </div>
       </div>

@@ -7,6 +7,7 @@ import Header from "../components/Header";
 import Project from "../components/Project/Project";
 import StatusEvaluation from "../components/StatusEvaluation";
 import { useNavigate } from "react-router-dom";
+import { FaChartLine } from "react-icons/fa";
 
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 
@@ -26,6 +27,14 @@ export default function Dashboard() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('team');
 
+  const [localProjectName, setLocalProjectName] = useState('');
+
+  useEffect(() => {
+    if (profile?.project_name) {
+        setLocalProjectName(profile.project_name);
+    }
+  }, [profile]);
+
   useEffect(() => {
     if (profile) {
       setLoadingMembers(true);
@@ -34,13 +43,15 @@ export default function Dashboard() {
         let teamList: string[] = [];
         let directorList: string[] = [];
 
+        const projectFilter = profile.user_role === 'Gestor' ? (localProjectName || profile.project_name) : null;
+
         const { data: notionData, error: notionError } = await supabase.functions.invoke(
             "get-notion-members",
             {
               method: "POST",
               body: {
                 filter_type: profile.user_role,
-                filter_value: profile.user_role === 'Gestor' ? profile.project_name : (profile.user_role === 'Diretor' ? profile.assessoria : null),
+                filter_value: profile.user_role === 'Gestor' ? projectFilter : (profile.user_role === 'Diretor' ? profile.assessoria : null),
                 exclude_name: profile.notion_name,
                 user_name: profile.notion_name, 
               },
@@ -84,11 +95,31 @@ export default function Dashboard() {
 
       fetchTargets();
     }
-  }, [profile]);
+  }, [profile, localProjectName]); 
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
+  };
+
+  const handleEditProjectName = async () => {
+    if (!user) return;
+
+    const newName = window.prompt("Novo nome do projeto (Deve ser idêntico à tag no Notion):", localProjectName);
+    
+    if (newName && newName !== localProjectName) {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ project_name: newName })
+            .eq('id', user.id);
+
+        if (error) {
+            alert("Erro ao atualizar nome: " + error.message);
+        } else {
+            setLocalProjectName(newName);
+            alert("Projeto atualizado! Lembre-se que a tag no Notion deve ser igual.");
+        }
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -194,7 +225,7 @@ export default function Dashboard() {
   if (profile.user_role === "Diretor") contextTitle = profile.assessoria;
   else if (profile.user_role === "Membro") contextTitle = `Equipe e Liderança`;
   else if (profile.user_role === "Gestor") {
-      contextTitle = viewMode === 'team' ? (profile.project_name || "Projeto") : `Diretoria (${profile.assessoria})`;
+      contextTitle = viewMode === 'team' ? (localProjectName || "Projeto") : `Diretoria (${profile.assessoria})`;
   }
 
   return (
@@ -212,8 +243,18 @@ export default function Dashboard() {
             </div>
         ) : (
             <>
-                {/* --- TOGGLE PARA GESTORES --- */}
-                {/* Só aparece se for Gestor e houver diretores para avaliar */}
+                {profile.assessoria === 'Recursos Humanos' && (
+                    <div className="flex justify-center mt-6">
+                        <button
+                            onClick={() => navigate('/analytics')}
+                            className="flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
+                        >
+                            <FaChartLine className="text-laranja group-hover:text-azulEscuroPage transition-colors" />
+                            Acessar Painel de Analytics
+                        </button>
+                    </div>
+                )}
+
                 {profile.user_role === 'Gestor' && directors.length > 0 && (
                     <div className="flex justify-center gap-4 my-6">
                         <button
@@ -245,9 +286,9 @@ export default function Dashboard() {
                     evaluate={setEvaluatingMember}
                     submit={handleSubmitAll}
                     loading={isSubmitting}
+                    onEditTitle={(profile.user_role === 'Gestor' && viewMode === 'team') ? handleEditProjectName : undefined}
                 />
                 
-                {/* Mensagem caso a lista esteja vazia */}
                 {displayedMembers.length === 0 && (
                     <p className="text-center text-gray-500 mt-4">
                         Ninguém encontrado nesta categoria.
@@ -264,14 +305,14 @@ export default function Dashboard() {
       />
 
       {evaluatingMember && (
-  <EvaluationModal
-    memberName={evaluatingMember}
-    evaluationType={directors.includes(evaluatingMember) ? 'director' : 'member'}
-    initialData={pendingEvaluations.get(evaluatingMember)}
-    onClose={() => setEvaluatingMember(null)}
-    onSubmit={handleSaveEvaluation}
-  />
-)}
+        <EvaluationModal
+          memberName={evaluatingMember}
+          initialData={pendingEvaluations.get(evaluatingMember)}
+          onClose={() => setEvaluatingMember(null)}
+          onSubmit={handleSaveEvaluation}
+          evaluationType={directors.includes(evaluatingMember) ? 'director' : 'member'}
+        />
+      )}
     </div>
   );
 }
