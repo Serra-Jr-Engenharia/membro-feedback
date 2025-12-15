@@ -17,10 +17,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
   
   // Estados para as listas de membros
-  const [teamMembers, setTeamMembers] = useState<string[]>([]); 
-  const [projectManagers, setProjectManagers] = useState<string[]>([]); 
-  const [sectorDirectors, setSectorDirectors] = useState<string[]>([]); 
+  const [teamMembers, setTeamMembers] = useState<string[]>([]); // Colegas (Peers)
+  const [projectManagers, setProjectManagers] = useState<string[]>([]); // Gestores (para Membros)
+  const [sectorDirectors, setSectorDirectors] = useState<string[]>([]); // Diretores (para Membros)
   
+  // Estado específico para quando o Gestor avalia seu Diretor
   const [gestorDirectors, setGestorDirectors] = useState<string[]>([]);
 
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -28,6 +29,7 @@ export default function Dashboard() {
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluationsMap>(new Map());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Estado para controlar a visualização (apenas para Gestores)
   const [viewMode, setViewMode] = useState<ViewMode>('team');
   
   const [localProjectName, setLocalProjectName] = useState('');
@@ -45,6 +47,7 @@ export default function Dashboard() {
       const fetchTargets = async () => {
         let notionMembersList: string[] = [];
 
+        // 1. BUSCA DA EQUIPE NO NOTION (Para todos)
         const projectFilter = profile.user_role === 'Gestor' ? (localProjectName || profile.project_name) : null;
 
         const { data: notionData, error: notionError } = await supabase.functions.invoke(
@@ -65,7 +68,10 @@ export default function Dashboard() {
           } else {
             notionMembersList = [...(notionData.members || [])];
           }
+
+        // 2. BUSCA DE LIDERANÇA NO SUPABASE
         
+        // --- CENÁRIO: MEMBRO ---
         if (profile.user_role === 'Membro') {
             setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
 
@@ -83,6 +89,7 @@ export default function Dashboard() {
             }
         } 
         
+        // --- CENÁRIO: GESTOR ---
         else if (profile.user_role === 'Gestor') {
             setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
 
@@ -97,6 +104,7 @@ export default function Dashboard() {
             }
         }
         
+        // --- CENÁRIO: DIRETOR ---
         else if (profile.user_role === 'Diretor') {
              setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
         }
@@ -163,31 +171,23 @@ export default function Dashboard() {
       return;
     }
 
-    let currentTotalList: string[] = [];
-    
-    if (profile.user_role === 'Membro') {
-        currentTotalList = [...teamMembers, ...projectManagers, ...sectorDirectors];
-    } else if (profile.user_role === 'Gestor') {
-        currentTotalList = viewMode === 'director' ? gestorDirectors : teamMembers;
-    } else {
-        currentTotalList = teamMembers;
-    }
-
     if (pendingEvaluations.size === 0) {
       alert("Nenhuma avaliação pendente para enviar.");
       return;
     }
 
-    const evaluatedCount = Array.from(pendingEvaluations.keys()).length; // Simplificado
-    
+    // Adicionei uma confirmação simples baseada na quantidade
+    const confirm = window.confirm(`Deseja enviar ${pendingEvaluations.size} avaliações?`);
+    if (!confirm) return;
 
     setIsSubmitting(true);
 
     const evaluationsToInsert = Array.from(pendingEvaluations.entries()).map(
       ([memberName, formData]) => {
         
+        // Lógica: Se a pessoa avaliada for um dos líderes, é tipo 'director'
         let type = 'member';
-
+        
         if (
             projectManagers.includes(memberName) || 
             sectorDirectors.includes(memberName) || 
@@ -229,6 +229,7 @@ export default function Dashboard() {
     );
   }
 
+  // Cálculo total para o StatusEvaluation
   let totalMembersCount = 0;
   if (profile.user_role === 'Membro') {
       totalMembersCount = teamMembers.length + projectManagers.length + sectorDirectors.length;
@@ -308,6 +309,7 @@ export default function Dashboard() {
                         )}
                     </div>
                 ) : (
+                    // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR (Lógica Original) ---
                     <>
                         {/* Toggle para Gestores */}
                         {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
@@ -362,7 +364,7 @@ export default function Dashboard() {
 
       <StatusEvaluation
         totalMembers={totalMembersCount}
-        evaluated={Array.from(pendingEvaluations.keys()).length} 
+        evaluated={Array.from(pendingEvaluations.keys()).length}
         pending={totalMembersCount - Array.from(pendingEvaluations.keys()).length}
       />
 
