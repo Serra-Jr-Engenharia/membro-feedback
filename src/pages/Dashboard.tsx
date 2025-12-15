@@ -46,6 +46,7 @@ export default function Dashboard() {
       
       const fetchTargets = async () => {
         let notionMembersList: string[] = [];
+        let discoveredProjectName: string | null = null; // Variável para guardar o projeto descoberto
 
         // 1. BUSCA DA EQUIPE NO NOTION (Para todos)
         const projectFilter = profile.user_role === 'Gestor' ? (localProjectName || profile.project_name) : null;
@@ -67,33 +68,45 @@ export default function Dashboard() {
             console.error("Erro ao buscar do Notion:", notionError);
           } else {
             notionMembersList = [...(notionData.members || [])];
+            if (notionData.detected_project) {
+                discoveredProjectName = notionData.detected_project;
+                setLocalProjectName(discoveredProjectName || ""); 
+            }
           }
 
-        // 2. BUSCA DE LIDERANÇA NO SUPABASE
         
-        // --- CENÁRIO: MEMBRO ---
         if (profile.user_role === 'Membro') {
-            // Membro NÃO vê mais colegas para avaliar, apenas líderes.
-            // Mas mantemos a busca caso precise no futuro, ou limpamos setTeamMembers.
-            setTeamMembers([]); // Limpa ou não usa
+            const targetProject = discoveredProjectName || profile.project_name;
 
-            const { data: leadersData } = await supabase
-                .from('profiles')
-                .select('notion_name, user_role')
-                .or(`and(user_role.eq.Diretor,assessoria.eq."${profile.assessoria}"),and(user_role.eq.Gestor,project_name.eq."${profile.project_name}")`);
-            
-            if (leadersData) {
-                const managers = leadersData.filter(l => l.user_role === 'Gestor').map(l => l.notion_name);
-                const directors = leadersData.filter(l => l.user_role === 'Diretor').map(l => l.notion_name);
+            setTeamMembers([]);
+
+            if (targetProject) {
+                const { data: leadersData } = await supabase
+                    .from('profiles')
+                    .select('notion_name, user_role')
+                    .or(`and(user_role.eq.Diretor,assessoria.eq."${profile.assessoria}"),and(user_role.eq.Gestor,project_name.eq."${targetProject}")`);
                 
-                setProjectManagers(managers.filter(name => name !== profile.notion_name));
-                setSectorDirectors(directors.filter(name => name !== profile.notion_name));
+                if (leadersData) {
+                    const managers = leadersData.filter(l => l.user_role === 'Gestor').map(l => l.notion_name);
+                    const directors = leadersData.filter(l => l.user_role === 'Diretor').map(l => l.notion_name);
+                    
+                    setProjectManagers(managers.filter(name => name !== profile.notion_name));
+                    setSectorDirectors(directors.filter(name => name !== profile.notion_name));
+                }
+            } else {
+                 const { data: directorsOnly } = await supabase
+                    .from('profiles')
+                    .select('notion_name')
+                    .eq('user_role', 'Diretor')
+                    .eq('assessoria', profile.assessoria);
+                 
+                 if (directorsOnly) {
+                     setSectorDirectors(directorsOnly.map(d => d.notion_name));
+                 }
             }
-        } 
+        }
         
-        // --- CENÁRIO: GESTOR ---
         else if (profile.user_role === 'Gestor') {
-            // Gestor vê sua equipe do Notion
             setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
 
             const { data: directorData } = await supabase
@@ -106,8 +119,6 @@ export default function Dashboard() {
                 setGestorDirectors(directorData.map(d => d.notion_name).filter(name => name !== profile.notion_name));
             }
         }
-        
-        // --- CENÁRIO: DIRETOR ---
         else if (profile.user_role === 'Diretor') {
              setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
         }
@@ -187,7 +198,6 @@ export default function Dashboard() {
     const evaluationsToInsert = Array.from(pendingEvaluations.entries()).map(
       ([memberName, formData]) => {
         
-        // Lógica: Se a pessoa avaliada for um dos líderes, é tipo 'director'
         let type = 'member';
         
         if (
@@ -231,10 +241,8 @@ export default function Dashboard() {
     );
   }
 
-  // Cálculo total para o StatusEvaluation
   let totalMembersCount = 0;
   if (profile.user_role === 'Membro') {
-      // Membros só avaliam Gestores e Diretores agora
       totalMembersCount = projectManagers.length + sectorDirectors.length;
   } else if (profile.user_role === 'Gestor') {
       totalMembersCount = (viewMode === 'team' ? teamMembers.length : gestorDirectors.length);
@@ -277,7 +285,7 @@ export default function Dashboard() {
                         {/* Linha 1: Gestor do Projeto (Título = Nome do Projeto) */}
                         {projectManagers.length > 0 && (
                             <Project
-                                nome={localProjectName || "Projeto"} // Mostra o nome do projeto
+                                nome={localProjectName || "Projeto"} 
                                 membros={projectManagers}
                                 evaluate={setEvaluatingMember}
                                 submit={handleSubmitAll}
@@ -303,7 +311,6 @@ export default function Dashboard() {
                         )}
                     </div>
                 ) : (
-                    // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR (Mantida) ---
                     <>
                         {/* Toggle para Gestores */}
                         {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
@@ -368,7 +375,6 @@ export default function Dashboard() {
           initialData={pendingEvaluations.get(evaluatingMember)}
           onClose={() => setEvaluatingMember(null)}
           onSubmit={handleSaveEvaluation}
-          // Lógica: Se for um dos líderes, usa 'director' (métricas de liderança). Senão, 'member'.
           evaluationType={
             (projectManagers.includes(evaluatingMember) || 
              sectorDirectors.includes(evaluatingMember) || 
