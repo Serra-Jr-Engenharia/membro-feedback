@@ -73,7 +73,9 @@ export default function Dashboard() {
         
         // --- CENÁRIO: MEMBRO ---
         if (profile.user_role === 'Membro') {
-            setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
+            // Membro NÃO vê mais colegas para avaliar, apenas líderes.
+            // Mas mantemos a busca caso precise no futuro, ou limpamos setTeamMembers.
+            setTeamMembers([]); // Limpa ou não usa
 
             const { data: leadersData } = await supabase
                 .from('profiles')
@@ -91,6 +93,7 @@ export default function Dashboard() {
         
         // --- CENÁRIO: GESTOR ---
         else if (profile.user_role === 'Gestor') {
+            // Gestor vê sua equipe do Notion
             setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
 
             const { data: directorData } = await supabase
@@ -176,7 +179,6 @@ export default function Dashboard() {
       return;
     }
 
-    // Adicionei uma confirmação simples baseada na quantidade
     const confirm = window.confirm(`Deseja enviar ${pendingEvaluations.size} avaliações?`);
     if (!confirm) return;
 
@@ -232,7 +234,8 @@ export default function Dashboard() {
   // Cálculo total para o StatusEvaluation
   let totalMembersCount = 0;
   if (profile.user_role === 'Membro') {
-      totalMembersCount = teamMembers.length + projectManagers.length + sectorDirectors.length;
+      // Membros só avaliam Gestores e Diretores agora
+      totalMembersCount = projectManagers.length + sectorDirectors.length;
   } else if (profile.user_role === 'Gestor') {
       totalMembersCount = (viewMode === 'team' ? teamMembers.length : gestorDirectors.length);
   } else {
@@ -267,25 +270,14 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* --- RENDERIZAÇÃO PARA MEMBRO (3 Linhas Separadas) --- */}
+                {/* --- RENDERIZAÇÃO PARA MEMBRO (2 Linhas: Gestor e Diretor) --- */}
                 {profile.user_role === 'Membro' ? (
                     <div className="flex flex-col gap-8">
                         
-                        {/* Linha 1: Equipe (Peers) */}
-                        {teamMembers.length > 0 && (
-                            <Project
-                                nome="Equipe do Projeto"
-                                membros={teamMembers}
-                                evaluate={setEvaluatingMember}
-                                submit={handleSubmitAll}
-                                loading={isSubmitting}
-                            />
-                        )}
-
-                        {/* Linha 2: Gestor do Projeto */}
+                        {/* Linha 1: Gestor do Projeto (Título = Nome do Projeto) */}
                         {projectManagers.length > 0 && (
                             <Project
-                                nome="Gestor do Projeto"
+                                nome={localProjectName || "Projeto"} // Mostra o nome do projeto
                                 membros={projectManagers}
                                 evaluate={setEvaluatingMember}
                                 submit={handleSubmitAll}
@@ -293,7 +285,7 @@ export default function Dashboard() {
                             />
                         )}
 
-                        {/* Linha 3: Diretor da Assessoria */}
+                        {/* Linha 2: Diretor da Assessoria */}
                         {sectorDirectors.length > 0 && (
                             <Project
                                 nome={`Diretor (${profile.assessoria})`}
@@ -305,11 +297,13 @@ export default function Dashboard() {
                         )}
 
                         {totalMembersCount === 0 && (
-                            <p className="text-center text-gray-500 mt-10">Ninguém encontrado para avaliar.</p>
+                            <p className="text-center text-gray-500 mt-10">
+                                Nenhum gestor ou diretor encontrado para avaliar.
+                            </p>
                         )}
                     </div>
                 ) : (
-                    // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR (Lógica Original) ---
+                    // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR (Mantida) ---
                     <>
                         {/* Toggle para Gestores */}
                         {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
@@ -374,6 +368,7 @@ export default function Dashboard() {
           initialData={pendingEvaluations.get(evaluatingMember)}
           onClose={() => setEvaluatingMember(null)}
           onSubmit={handleSaveEvaluation}
+          // Lógica: Se for um dos líderes, usa 'director' (métricas de liderança). Senão, 'member'.
           evaluationType={
             (projectManagers.includes(evaluatingMember) || 
              sectorDirectors.includes(evaluatingMember) || 
