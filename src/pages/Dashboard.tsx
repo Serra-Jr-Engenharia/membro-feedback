@@ -17,11 +17,10 @@ export default function Dashboard() {
   const navigate = useNavigate();
   
   // Estados para as listas
-  const [teamMembers, setTeamMembers] = useState<string[]>([]); // Colegas (Só para Gestor/Diretor)
-  const [projectManagers, setProjectManagers] = useState<string[]>([]); // Gestor (Só para Membro)
-  const [sectorDirectors, setSectorDirectors] = useState<string[]>([]); // Diretor (Só para Membro)
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
+  const [projectManagers, setProjectManagers] = useState<string[]>([]); 
+  const [sectorDirectors, setSectorDirectors] = useState<string[]>([]); 
   
-  // Estado específico para quando o Gestor avalia seu Diretor
   const [gestorDirectors, setGestorDirectors] = useState<string[]>([]);
 
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -29,12 +28,9 @@ export default function Dashboard() {
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluationsMap>(new Map());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Estado para controlar a visualização (apenas para Gestores)
   const [viewMode, setViewMode] = useState<ViewMode>('team');
-  
   const [localProjectName, setLocalProjectName] = useState('');
 
-  // Sincroniza nome do projeto inicial
   useEffect(() => {
     if (profile?.project_name) {
         setLocalProjectName(profile.project_name);
@@ -49,7 +45,7 @@ export default function Dashboard() {
         let notionMembersList: string[] = [];
         let discoveredProjectName: string | null = null;
 
-        // 1. BUSCA DA EQUIPE NO NOTION (Para pegar lista ou descobrir projeto)
+        // 1. BUSCA DA EQUIPE NO NOTION
         const projectFilter = profile.user_role === 'Gestor' ? (localProjectName || profile.project_name) : null;
 
         const { data: notionData, error: notionError } = await supabase.functions.invoke(
@@ -68,61 +64,59 @@ export default function Dashboard() {
           if (notionError) {
             console.error("Erro ao buscar do Notion:", notionError);
           } else {
-            // Guarda a lista bruta, mas só usaremos se for Gestor/Diretor
             notionMembersList = [...(notionData.members || [])];
             
-            // Se descobriu o projeto (Membro), salva
             if (notionData.detected_project) {
                 discoveredProjectName = notionData.detected_project;
                 setLocalProjectName(discoveredProjectName || ""); 
             }
           }
 
-        // 2. LOGICA DE DISTRIBUIÇÃO (Quem vê quem)
+        // 2. LÓGICA DE BUSCA DE LÍDERES (Refatorada para segurança)
         
         // --- CENÁRIO: MEMBRO ---
         if (profile.user_role === 'Membro') {
-            console.log("Perfil Membro detectado. Limpando teamMembers...");
-            setTeamMembers([]); // <--- GARANTE QUE A LISTA DE PARES FIQUE VAZIA
+            setTeamMembers([]); // Limpa lista de pares
 
             const targetProject = discoveredProjectName || profile.project_name;
+            console.log("Projeto Alvo para buscar Gestor:", targetProject);
 
+            // A. BUSCA DIRETORES (Sempre busca pela assessoria)
+            const { data: directorsData } = await supabase
+                .from('profiles')
+                .select('notion_name')
+                .eq('user_role', 'Diretor')
+                .eq('assessoria', profile.assessoria);
+            
+            if (directorsData) {
+                setSectorDirectors(directorsData.map(d => d.notion_name).filter(n => n !== profile.notion_name));
+            }
+
+            // B. BUSCA GESTORES (Só se tiver projeto)
             if (targetProject) {
-                console.log(`Buscando Gestor para o projeto: ${targetProject}`);
-                
-                // Busca Gestor e Diretor no banco de perfis
-                const { data: leadersData } = await supabase
-                    .from('profiles')
-                    .select('notion_name, user_role')
-                    .or(`and(user_role.eq.Diretor,assessoria.eq."${profile.assessoria}"),and(user_role.eq.Gestor,project_name.eq."${targetProject}")`);
-                
-                if (leadersData) {
-                    const managers = leadersData.filter(l => l.user_role === 'Gestor').map(l => l.notion_name);
-                    const directors = leadersData.filter(l => l.user_role === 'Diretor').map(l => l.notion_name);
-                    
-                    setProjectManagers(managers.filter(name => name !== profile.notion_name));
-                    setSectorDirectors(directors.filter(name => name !== profile.notion_name));
-                }
-            } else {
-                // Fallback se não tiver projeto: Busca só Diretor
-                 const { data: directorsOnly } = await supabase
+                const { data: managersData, error: managerError } = await supabase
                     .from('profiles')
                     .select('notion_name')
-                    .eq('user_role', 'Diretor')
-                    .eq('assessoria', profile.assessoria);
-                 
-                 if (directorsOnly) {
-                     setSectorDirectors(directorsOnly.map(d => d.notion_name));
-                 }
+                    .eq('user_role', 'Gestor')
+                    .eq('project_name', targetProject); // Busca exata pelo nome do projeto
+                
+                if (managerError) {
+                    console.error("Erro ao buscar gestor:", managerError);
+                }
+
+                if (managersData && managersData.length > 0) {
+                    console.log("Gestores encontrados:", managersData);
+                    setProjectManagers(managersData.map(m => m.notion_name).filter(n => n !== profile.notion_name));
+                } else {
+                    console.warn(`Nenhum gestor encontrado no banco para o projeto: "${targetProject}"`);
+                }
             }
         } 
         
         // --- CENÁRIO: GESTOR ---
         else if (profile.user_role === 'Gestor') {
-            // Gestor vê a lista do Notion
             setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
 
-            // Busca seu Diretor
             const { data: directorData } = await supabase
                 .from('profiles')
                 .select('notion_name')
@@ -215,7 +209,6 @@ export default function Dashboard() {
       ([memberName, formData]) => {
         let type = 'member';
         
-        // Verifica se é Líder
         if (
             projectManagers.includes(memberName) || 
             sectorDirectors.includes(memberName) || 
@@ -257,7 +250,7 @@ export default function Dashboard() {
     );
   }
 
-  // Contagem para o footer
+  // Cálculo total para o StatusEvaluation
   let totalMembersCount = 0;
   if (profile.user_role === 'Membro') {
       totalMembersCount = projectManagers.length + sectorDirectors.length;
@@ -295,7 +288,7 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* --- RENDERIZAÇÃO PARA MEMBRO (Gestor e Diretor APENAS) --- */}
+                {/* --- RENDERIZAÇÃO PARA MEMBRO (2 Linhas Separadas) --- */}
                 {profile.user_role === 'Membro' ? (
                     <div className="flex flex-col gap-8">
                         
@@ -309,9 +302,10 @@ export default function Dashboard() {
                                 loading={isSubmitting}
                             />
                         ) : (
-                            <p className="text-center text-gray-500 mt-4 text-sm">
-                                Gestor do projeto não encontrado no sistema.
-                            </p>
+                            <div className="text-center text-gray-500 mt-4 text-sm border border-dashed border-gray-700 rounded p-4">
+                                <p>Nenhum gestor encontrado para o projeto: <strong>{localProjectName || "?"}</strong></p>
+                                <p className="text-xs mt-1">(Verifique se o Gestor já criou a conta e se o nome do projeto está idêntico no Notion)</p>
+                            </div>
                         )}
 
                         {/* Linha 2: Diretor da Assessoria */}
@@ -326,7 +320,7 @@ export default function Dashboard() {
                         )}
                     </div>
                 ) : (
-                    // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR (Listas Normais) ---
+                    // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR ---
                     <>
                         {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
                             <div className="flex justify-center gap-4 my-6">
@@ -390,7 +384,6 @@ export default function Dashboard() {
           initialData={pendingEvaluations.get(evaluatingMember)}
           onClose={() => setEvaluatingMember(null)}
           onSubmit={handleSaveEvaluation}
-          // Passa 'director' se estiver na lista de chefes
           evaluationType={
             (projectManagers.includes(evaluatingMember) || 
              sectorDirectors.includes(evaluatingMember) || 
