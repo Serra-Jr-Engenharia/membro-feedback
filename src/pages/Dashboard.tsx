@@ -8,6 +8,8 @@ import Project from "../components/Project/Project";
 import StatusEvaluation from "../components/StatusEvaluation";
 import { useNavigate } from "react-router-dom";
 import { FaChartLine } from "react-icons/fa";
+import ReviewModal from "../components/ReviewModal";
+
 
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 type ViewMode = 'team' | 'director';
@@ -30,6 +32,9 @@ export default function Dashboard() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('team');
   const [localProjectName, setLocalProjectName] = useState('');
+
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+
 
   useEffect(() => {
     if (profile?.project_name) {
@@ -260,6 +265,48 @@ export default function Dashboard() {
       totalMembersCount = teamMembers.length;
   }
 
+  const reviewTargets: { nome: string; evaluationType: 'member' | 'director' }[] = (() => {
+    if (!profile) return [];
+
+    if (profile.user_role === 'Membro') {
+      const nomes = [...projectManagers, ...sectorDirectors];
+      return nomes.map((nome) => ({ nome, evaluationType: 'director' }));
+    }
+
+    if (profile.user_role === 'Gestor') {
+      if (viewMode === 'director') {
+        return gestorDirectors.map((nome) => ({ nome, evaluationType: 'director' }));
+      }
+      return teamMembers.map((nome) => ({ nome, evaluationType: 'member' }));
+    }
+
+    return teamMembers.map((nome) => ({ nome, evaluationType: 'member' }));
+  })();
+
+
+  const reviewItems = reviewTargets.map(({ nome, evaluationType }) => ({
+    nome,
+    evaluationType,
+    data: pendingEvaluations.get(nome) ?? {
+      rating_comunicacao: 0,
+      rating_proatividade: 0,
+      comments: "",
+      ...(evaluationType === 'member'
+        ? {
+            rating_participacao: 0,
+            rating_relacao_grupo: 0,
+            rating_entrega_metas: 0,
+            is_destaque: false,
+          }
+        : {
+            rating_lideranca: 0,
+            rating_flexibilidade: 0,
+            text_delegacao: "Alguns",
+          }),
+    },
+  }));
+
+
   return (
     <div className="min-h-screen bg-azulEscuroPage text-gray-200 relative pb-24">
       <div className="p-8 pt-2 mx-auto">
@@ -300,6 +347,7 @@ export default function Dashboard() {
                                 evaluate={setEvaluatingMember}
                                 submit={handleSubmitAll}
                                 loading={isSubmitting}
+                                onReview={() => setIsReviewOpen(true)}
                             />
                         ) : (
                             <div className="text-center text-gray-500 mt-4 text-sm border border-dashed border-gray-700 rounded p-4">
@@ -316,6 +364,7 @@ export default function Dashboard() {
                                 evaluate={setEvaluatingMember}
                                 submit={handleSubmitAll}
                                 loading={isSubmitting}
+                                onReview={() => setIsReviewOpen(true)}
                             />
                         )}
                     </div>
@@ -361,6 +410,7 @@ export default function Dashboard() {
                             submit={handleSubmitAll}
                             loading={isSubmitting}
                             onEditTitle={(profile.user_role === 'Gestor' && viewMode === 'team') ? handleEditProjectName : undefined}
+                            onReview={() => setIsReviewOpen(true)}
                         />
                         
                         {teamMembers.length === 0 && (profile.user_role !== 'Gestor' || viewMode === 'team') && (
@@ -393,6 +443,14 @@ export default function Dashboard() {
           }
         />
       )}
+
+      <ReviewModal
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        items={reviewItems}
+        title="Resumo das avaliações atuais"
+      />
+
     </div>
   );
 }
