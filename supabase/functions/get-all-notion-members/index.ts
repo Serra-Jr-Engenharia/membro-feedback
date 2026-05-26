@@ -25,9 +25,10 @@ Deno.serve(async (req) => {
       // Sem filtro! Queremos todos.
     })
 
-    const members = response.results.map((page: any) => {
+    const members = response.results.map((page: unknown) => {
       // Confirme se a coluna de nome é "Nome"
-      return page.properties.Nome.title[0].plain_text 
+      const typedPage = page as { properties: { Nome: { title: { plain_text: string }[] } } };
+      return typedPage.properties.Nome.title[0].plain_text;
     })
 
     // Remove duplicados, se houver, e ordena
@@ -36,9 +37,10 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ members: uniqueMembers }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Erro ao buscar todos os membros:', error) 
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

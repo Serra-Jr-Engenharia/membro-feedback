@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
 
     console.log(`Request: Tipo=${filter_type}, Valor=${filter_value}, User=${user_name}`)
 
-    let notionFilter: any;
+    let notionFilter: Record<string, unknown>;
     let detectedProject: string | null = null; 
 
     if (filter_type === 'Diretor') {
@@ -55,8 +55,8 @@ Deno.serve(async (req) => {
         })
       }
 
-      const memberPage: any = memberQuery.results[0];
-      const projects = memberPage.properties.Projetos?.multi_select.map((p: any) => p.name) || [];
+      const memberPage = memberQuery.results[0] as { properties: { Projetos?: { multi_select: { name: string }[] } } };
+      const projects = memberPage.properties.Projetos?.multi_select.map((p: { name: string }) => p.name) || [];
 
       if (projects.length === 0) {
         return new Response(JSON.stringify({ members: [], project: null }), {
@@ -86,8 +86,9 @@ Deno.serve(async (req) => {
       filter: notionFilter,
     })
 
-    const allMembers = response.results.map((page: any) => {
-      return page.properties.Nome.title[0]?.plain_text || "Sem Nome"
+    const allMembers = response.results.map((page: unknown) => {
+      const typedPage = page as { properties: { Nome: { title: { plain_text: string }[] } } };
+      return typedPage.properties.Nome.title[0]?.plain_text || "Sem Nome"
     })
 
     const uniqueMembers = [...new Set(allMembers)].filter(name => name !== exclude_name);
@@ -99,9 +100,10 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Erro na Edge Function:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

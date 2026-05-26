@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [evaluatingMember, setEvaluatingMember] = useState<string | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluationsMap>(new Map());
+  const [isPendingLoaded, setIsPendingLoaded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>('team');
@@ -41,6 +42,26 @@ export default function Dashboard() {
         setLocalProjectName(profile.project_name);
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (user && !isPendingLoaded) {
+      const saved = localStorage.getItem(`pendingEvals_${user.id}`);
+      if (saved) {
+        try {
+          setPendingEvaluations(new Map(JSON.parse(saved)));
+        } catch (e) {
+          console.error("Erro ao carregar avaliações pendentes", e);
+        }
+      }
+      setIsPendingLoaded(true);
+    }
+  }, [user, isPendingLoaded]);
+
+  useEffect(() => {
+    if (user && isPendingLoaded) {
+      localStorage.setItem(`pendingEvals_${user.id}`, JSON.stringify(Array.from(pendingEvaluations.entries())));
+    }
+  }, [pendingEvaluations, user, isPendingLoaded]);
 
   useEffect(() => {
     if (profile) {
@@ -180,9 +201,10 @@ export default function Dashboard() {
       alert("Sua conta foi excluída com sucesso.");
       await supabase.auth.signOut();
       navigate('/login');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro:", err);
-      alert("Erro ao excluir conta: " + (err.message || "Erro desconhecido"));
+      const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
+      alert("Erro ao excluir conta: " + errorMessage);
     }
   };
 
@@ -242,6 +264,9 @@ export default function Dashboard() {
     } else {
       alert(`Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`);
       setPendingEvaluations(new Map());
+      if (user) {
+        localStorage.removeItem(`pendingEvals_${user.id}`);
+      }
     }
 
     setIsSubmitting(false);

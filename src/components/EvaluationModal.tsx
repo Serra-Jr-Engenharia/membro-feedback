@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import StarRating from "./StarRating";
 import userIcon from "../assets/userIcon.svg";
 
@@ -46,6 +46,43 @@ export default function EvaluationModal({
   const [flexibilidade, setFlexibilidade] = useState(initialData?.rating_flexibilidade || 0);
   const [delegacao, setDelegacao] = useState(initialData?.text_delegacao || "Alguns");
 
+  useEffect(() => {
+    const draftStr = localStorage.getItem(`draft_eval_${memberName}`);
+    if (draftStr) {
+      try {
+        const draft = JSON.parse(draftStr);
+        if (draft.rating_comunicacao !== undefined) setComunicacao(draft.rating_comunicacao);
+        if (draft.rating_proatividade !== undefined) setProatividade(draft.rating_proatividade);
+        if (draft.comments !== undefined) setComments(draft.comments);
+        if (draft.rating_participacao !== undefined) setParticipacao(draft.rating_participacao);
+        if (draft.rating_relacao_grupo !== undefined) setRelacao(draft.rating_relacao_grupo);
+        if (draft.rating_entrega_metas !== undefined) setMetas(draft.rating_entrega_metas);
+        if (draft.is_destaque !== undefined) setIsDestaque(draft.is_destaque);
+        if (draft.rating_lideranca !== undefined) setLideranca(draft.rating_lideranca);
+        if (draft.rating_flexibilidade !== undefined) setFlexibilidade(draft.rating_flexibilidade);
+        if (draft.text_delegacao !== undefined) setDelegacao(draft.text_delegacao);
+      } catch (e) {
+        console.error("Erro ao carregar rascunho", e);
+      }
+    }
+  }, [memberName]);
+
+  useEffect(() => {
+    const draft = {
+      rating_comunicacao: comunicacao,
+      rating_proatividade: proatividade,
+      comments: comments,
+      rating_participacao: participacao,
+      rating_relacao_grupo: relacao,
+      rating_entrega_metas: metas,
+      is_destaque: isDestaque,
+      rating_lideranca: lideranca,
+      rating_flexibilidade: flexibilidade,
+      text_delegacao: delegacao,
+    };
+    localStorage.setItem(`draft_eval_${memberName}`, JSON.stringify(draft));
+  }, [comunicacao, proatividade, comments, participacao, relacao, metas, isDestaque, lideranca, flexibilidade, delegacao, memberName]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -65,6 +102,7 @@ export default function EvaluationModal({
       })
     };
 
+    localStorage.removeItem(`draft_eval_${memberName}`);
     onSubmit(formData);
     onClose();
   };
