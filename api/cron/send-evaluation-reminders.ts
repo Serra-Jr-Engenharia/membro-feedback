@@ -1,11 +1,11 @@
 /** Endpoint protegido pelo cron da Vercel que inicia o worker de lembretes. */
 import { createClient } from '@supabase/supabase-js'
-import { loadCycleEvidence } from '../../src/server/reminders/candidates'
-import { sendReminderEmail } from '../../src/server/reminders/email'
-import { markReminderFailed, markReminderSent, reserveReminder } from '../../src/server/reminders/reminder-log'
-import type { ReminderLogKey } from '../../src/server/reminders/reminder-log'
-import type { ReminderCandidate, ReminderProfile } from '../../src/server/reminders/types'
-import { runReminderWorker } from '../../src/server/reminders/worker'
+import { loadCycleEvidence } from '../../src/server/reminders/candidates.js'
+import { sendReminderEmail } from '../../src/server/reminders/email.js'
+import { markReminderFailed, markReminderSent, reserveReminder } from '../../src/server/reminders/reminder-log.js'
+import type { ReminderLogKey } from '../../src/server/reminders/reminder-log.js'
+import type { ReminderCandidate, ReminderProfile } from '../../src/server/reminders/types.js'
+import { runReminderWorker } from '../../src/server/reminders/worker.js'
 
 declare const process: { env: Record<string, string | undefined> }
 

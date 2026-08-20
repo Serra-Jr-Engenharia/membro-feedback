@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { sendReminderEmail } from './email'
-import type { ReminderCandidate } from './types'
+import { sendReminderEmail } from './email.js'
+import type { ReminderCandidate } from './types.js'
 
 const candidate: ReminderCandidate = {
   profile: { id: 'p-1', email: 'pessoa@exemplo.com', notion_name: 'Ana <script>alert(1)</script>', user_role: 'Membro' },

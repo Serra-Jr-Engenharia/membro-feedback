@@ -1,5 +1,5 @@
 /** Monta e envia o e-mail transacional de lembrete pelo Resend. */
-import type { ReminderCandidate, PendingKind } from './types'
+import type { ReminderCandidate, PendingKind } from './types.js'
 
 export interface EmailConfig {
   /** Segredos e origem usados somente no backend/serverless. */

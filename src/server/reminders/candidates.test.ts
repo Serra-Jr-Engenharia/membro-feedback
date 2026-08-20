@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { findPendingCandidate, loadCycleEvidence } from './candidates'
-import type { CycleEvidence, ReminderProfile } from './types'
+import { findPendingCandidate, loadCycleEvidence } from './candidates.js'
+import type { CycleEvidence, ReminderProfile } from './types.js'
 
 const cycle = {
   type: 'weekly' as const,

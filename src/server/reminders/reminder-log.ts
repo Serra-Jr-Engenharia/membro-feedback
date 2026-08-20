@@ -1,7 +1,7 @@
 /** Persiste reservas e resultados para garantir idempotência e rastreabilidade. */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CycleType } from './cycles'
-import type { ReminderCandidate } from './types'
+import type { CycleType } from './cycles.js'
+import type { ReminderCandidate } from './types.js'
 
 const MAX_ERROR_MESSAGE_LENGTH = 1_000
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { runReminderWorker } from './worker'
-import type { CycleWindow } from './cycles'
-import type { CycleEvidence, ReminderProfile } from './types'
+import { runReminderWorker } from './worker.js'
+import type { CycleWindow } from './cycles.js'
+import type { CycleEvidence, ReminderProfile } from './types.js'
 import handler from '../../../api/cron/send-evaluation-reminders'
 
 declare const process: { env: Record<string, string | undefined> }

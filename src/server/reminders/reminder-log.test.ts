@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { markReminderFailed, markReminderSent, reserveReminder } from './reminder-log'
-import type { ReminderCandidate } from './types'
+import { markReminderFailed, markReminderSent, reserveReminder } from './reminder-log.js'
+import type { ReminderCandidate } from './types.js'
 
 const candidate: ReminderCandidate = {
   profile: { id: '11111111-1111-1111-1111-111111111111', email: 'pessoa@exemplo.com', notion_name: 'Pessoa', user_role: 'Membro' },

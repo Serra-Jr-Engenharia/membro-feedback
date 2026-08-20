@@ -1,12 +1,12 @@
 /** Orquestra a varredura diária, envio, idempotência e contadores da execução. */
-import { findPendingCandidate } from "./candidates";
-import { getCycleWindow, isReminderWindow } from "./cycles";
-import type { CycleWindow } from "./cycles";
+import { findPendingCandidate } from "./candidates.js";
+import { getCycleWindow, isReminderWindow } from "./cycles.js";
+import type { CycleWindow } from "./cycles.js";
 import type {
   CycleEvidence,
   ReminderCandidate,
   ReminderProfile,
-} from "./types";
+} from "./types.js";
 
 export interface ReminderRunResult {
   /** Perfis cujo ciclo está na janela de lembrete. */

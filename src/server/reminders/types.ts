@@ -1,5 +1,5 @@
 /** Tipos compartilhados entre cálculo de ciclos, worker, banco e e-mail. */
-import type { CycleWindow } from './cycles'
+import type { CycleWindow } from './cycles.js'
 
 export type PendingKind = 'peer_evaluation' | 'self_evaluation'
 

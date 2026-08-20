@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getCycleWindow, isReminderWindow } from './cycles'
+import { getCycleWindow, isReminderWindow } from './cycles.js'
 
 describe('getCycleWindow', () => {
   it('calcula a janela semanal e reconhece a sexta-feira', () => {

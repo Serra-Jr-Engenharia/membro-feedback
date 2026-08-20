@@ -1,7 +1,7 @@
 /** Consulta evidências no Supabase e transforma pendências em candidatos a lembrete. */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CycleWindow } from './cycles'
-import type { CycleEvidence, PendingKind, ReminderCandidate, ReminderProfile } from './types'
+import type { CycleWindow } from './cycles.js'
+import type { CycleEvidence, PendingKind, ReminderCandidate, ReminderProfile } from './types.js'
 
 /** Decide quais avaliações ainda faltam para um perfil no ciclo informado. */
 export function findPendingCandidate(evidence: CycleEvidence): ReminderCandidate | null {
