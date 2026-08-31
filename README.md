@@ -1,3 +1,32 @@
+# Membro Feedback
+
+## Lembretes de avaliação por e-mail
+
+Em produção, a Vercel executa diariamente `GET /api/cron/send-evaluation-reminders` pelo cron configurado em [vercel.json](vercel.json). O agendamento `0 11 * * *` está em UTC (atualmente, 08:00 em `America/Sao_Paulo`); o worker sempre decide a elegibilidade pela data local de São Paulo.
+
+O cron é automático somente em deployments de produção. No plano Hobby, a execução pode ocorrer dentro de uma janela aproximada de uma hora, portanto não deve ser tratada como pontual ao minuto.
+
+### Configuração de produção
+
+Antes do deployment de produção, cadastre as variáveis abaixo apenas no ambiente server-side da Vercel. Use [.env.example](.env.example) como referência de nomes e formatos, mas nunca copie segredos para arquivos versionados nem use o prefixo `VITE_`.
+
+| Variável | Finalidade |
+| --- | --- |
+| `CRON_SECRET` | Protege a rota do cron; a chamada precisa enviar `Authorization: Bearer <CRON_SECRET>`. |
+| `SUPABASE_URL` | URL do projeto Supabase. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Permite ao worker acessar os dados e os logs sem expor a credencial ao navegador. |
+| `RESEND_API_KEY` | Chave de API usada exclusivamente para enviar os e-mails. |
+| `RESEND_FROM_EMAIL` | Remetente; o domínio correspondente deve estar verificado no Resend antes da ativação. |
+| `APP_URL` | URL pública do dashboard usada no link do e-mail. |
+| `MEMBER_CYCLE_ANCHOR_DATE` | Segunda-feira que ancora os blocos quinzenais globais de Membros, no formato `YYYY-MM-DD`. |
+
+### Operação e acompanhamento
+
+- Não exponha a rota ao frontend: ela aceita somente `GET` e exige o `CRON_SECRET` no cabeçalho `Authorization`.
+- Acompanhe cada execução nos logs da Function na Vercel. A resposta registra os contadores `scanned`, `sent`, `skipped` e `failed`.
+- Use `reminder_logs` para conferir reservas, envios e falhas por usuário/ciclo. Falhas de entrega ficam registradas para diagnóstico e não são reenviadas automaticamente fora da janela de dois dias.
+- Antes de ativar, verifique o domínio remetente no Resend e configure todas as variáveis no ambiente de produção. Não dispare envios reais sem essa configuração explícita.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
