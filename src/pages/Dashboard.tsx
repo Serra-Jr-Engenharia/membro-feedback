@@ -9,10 +9,22 @@ import StatusEvaluation from "../components/StatusEvaluation";
 import { useNavigate } from "react-router-dom";
 import { FaChartLine } from "react-icons/fa";
 import ReviewModal from "../components/ReviewModal";
+import SelfEvaluationModal from "../components/SelfEvaluationModal";
+import type { SelfEvaluationFormData } from "../components/SelfEvaluationModal";
 
 
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 type ViewMode = 'team' | 'director';
+
+// Retorna a segunda-feira da semana ISO atual (formato YYYY-MM-DD), mesma base do week_of das avaliações.
+// Ajuste aqui caso queira aplicar o ciclo quinzenal dos Membros.
+function getCycleDate(): string {
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // 0 = segunda, ... 6 = domingo
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day);
+  return monday.toISOString().split("T")[0];
+}
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
@@ -35,6 +47,9 @@ export default function Dashboard() {
   const [localProjectName, setLocalProjectName] = useState('');
 
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+
+  const [selfEvalStatus, setSelfEvalStatus] = useState<'loading' | 'done' | 'pending'>('loading');
+  const [isSelfEvalOpen, setIsSelfEvalOpen] = useState(false);
 
 
   useEffect(() => {
@@ -62,6 +77,29 @@ export default function Dashboard() {
       localStorage.setItem(`pendingEvals_${user.id}`, JSON.stringify(Array.from(pendingEvaluations.entries())));
     }
   }, [pendingEvaluations, user, isPendingLoaded]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    const checkSelfEvaluation = async () => {
+      const { data } = await supabase
+        .from("self_evaluations")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("week_of", getCycleDate())
+        .maybeSingle();
+
+      if (!cancelled) {
+        setSelfEvalStatus(data ? "done" : "pending");
+      }
+    };
+
+    checkSelfEvaluation();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (profile) {
@@ -216,9 +254,32 @@ export default function Dashboard() {
     setEvaluatingMember(null);
   };
 
+  const handleSubmitSelfEvaluation = async (formData: SelfEvaluationFormData) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    const { error } = await supabase
+      .from("self_evaluations")
+      .upsert(
+        {
+          user_id: user.id,
+          week_of: getCycleDate(),
+          ...formData,
+        },
+        { onConflict: "user_id,week_of" }
+      );
+
+    if (error) throw error;
+    setSelfEvalStatus("done");
+  };
+
   const handleSubmitAll = async () => {
     if (!user || !profile) {
       alert("Erro de autenticação. Faça login novamente.");
+      return;
+    }
+
+    if (selfEvalStatus !== 'done') {
+      alert("Você precisa concluir sua autoavaliação antes de enviar as avaliações.");
       return;
     }
 
@@ -340,6 +401,23 @@ export default function Dashboard() {
             logout={handleLogout} 
             deleteAccount={handleDeleteAccount} 
         />
+        
+        {/* --- AUTOAVALIAÇÃO (botão/badge do ciclo atual) --- */}
+        <div className="flex justify-center mt-6">
+          {selfEvalStatus === 'done' ? (
+            <div className="flex items-center gap-2 px-6 py-3 bg-azulEscuroCard border border-green-500/40 rounded-lg text-green-400 font-medium">
+              <span className="w-2 h-2 rounded-full bg-green-400"></span>
+              Autoavaliação concluída
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsSelfEvalOpen(true)}
+              className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
+            >
+              Realizar Autoavaliação
+            </button>
+          )}
+        </div>
         
         {loadingMembers ? (
             <div className="mt-10 text-center text-gray-400 animate-pulse">
@@ -475,6 +553,14 @@ export default function Dashboard() {
         items={reviewItems}
         title="Resumo das avaliações atuais"
       />
+
+      {isSelfEvalOpen && (
+        <SelfEvaluationModal
+          userName={profile.notion_name}
+          onClose={() => setIsSelfEvalOpen(false)}
+          onSubmit={handleSubmitSelfEvaluation}
+        />
+      )}
 
     </div>
   );
