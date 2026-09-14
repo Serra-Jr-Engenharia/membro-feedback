@@ -9,10 +9,22 @@ import StatusEvaluation from "../components/StatusEvaluation";
 import { useNavigate } from "react-router-dom";
 import { FaChartLine } from "react-icons/fa";
 import ReviewModal from "../components/ReviewModal";
-
+import SelfEvaluationModal from "../components/SelfEvaluationModal";
+import type { SelfEvaluationFormData } from "../components/SelfEvaluationModal";
+import { getEvaluationStatus } from "../utils/evaluationStatus";
 
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 type ViewMode = 'team' | 'director';
+
+// Retorna a segunda-feira da semana ISO atual (formato YYYY-MM-DD), mesma base do week_of das avaliações.
+// Ajuste aqui caso queira aplicar o ciclo quinzenal dos Membros.
+function getCycleDate(): string {
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // 0 = segunda, ... 6 = domingo
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day);
+  return monday.toISOString().split("T")[0];
+}
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
@@ -20,9 +32,7 @@ export default function Dashboard() {
   
   // Estados para as listas
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
-  const [projectManagers, setProjectManagers] = useState<string[]>([]); 
   const [sectorDirectors, setSectorDirectors] = useState<string[]>([]); 
-  
   const [gestorDirectors, setGestorDirectors] = useState<string[]>([]);
 
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -33,9 +43,12 @@ export default function Dashboard() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('team');
   const [localProjectName, setLocalProjectName] = useState('');
-
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
+  const [selfEvalStatus, setSelfEvalStatus] = useState<'loading' | 'done' | 'pending'>('loading');
+  const [isSelfEvalOpen, setIsSelfEvalOpen] = useState(false);
+  // Estado da periodicidade 
+  const [evaluationStatus, setEvaluationStatus] = useState<'pending' | 'up-to-date' | null>(null);
 
   useEffect(() => {
     if (profile?.project_name) {
@@ -62,6 +75,57 @@ export default function Dashboard() {
       localStorage.setItem(`pendingEvals_${user.id}`, JSON.stringify(Array.from(pendingEvaluations.entries())));
     }
   }, [pendingEvaluations, user, isPendingLoaded]);
+
+  // Novo useEffect refatorado
+  useEffect(() => {
+    const checkEvaluationStatus = async () => {
+      if (!user || !profile) return;
+      if (profile.user_role !== 'Membro' && profile.user_role !== 'Diretor') return;
+
+      const { data, error } = await supabase
+        .from('evaluations')
+        .select('created_at')
+        .eq('director_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error("Erro ao buscar datas de avaliação:", error);
+        return;
+      }
+
+      const lastEvalDateStr = data && data.length > 0 ? data[0].created_at : null;
+
+      // Usa a função helper pura e elegante!
+      const status = getEvaluationStatus(profile.user_role, lastEvalDateStr);
+      setEvaluationStatus(status);
+    };
+
+    checkEvaluationStatus();
+  }, [user, profile]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    const checkSelfEvaluation = async () => {
+      const { data } = await supabase
+        .from("self_evaluations")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("week_of", getCycleDate())
+        .maybeSingle();
+
+      if (!cancelled) {
+        setSelfEvalStatus(data ? "done" : "pending");
+      }
+    };
+
+    checkSelfEvaluation();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (profile) {
@@ -98,16 +162,10 @@ export default function Dashboard() {
             }
           }
 
-        // 2. LÓGICA DE BUSCA DE LÍDERES (Refatorada para segurança)
+        // 2. LÓGICA DE BUSCA DE LÍDERES
         
         // --- CENÁRIO: MEMBRO ---
         if (profile.user_role === 'Membro') {
-            setTeamMembers([]); // Limpa lista de pares
-
-            const targetProject = discoveredProjectName || profile.project_name;
-            console.log("Projeto Alvo para buscar Gestor:", targetProject);
-
-            // A. BUSCA DIRETORES (Sempre busca pela assessoria)
             const { data: directorsData } = await supabase
                 .from('profiles')
                 .select('notion_name')
@@ -116,26 +174,6 @@ export default function Dashboard() {
             
             if (directorsData) {
                 setSectorDirectors(directorsData.map(d => d.notion_name).filter(n => n !== profile.notion_name));
-            }
-
-            // B. BUSCA GESTORES (Só se tiver projeto)
-            if (targetProject) {
-                const { data: managersData, error: managerError } = await supabase
-                    .from('profiles')
-                    .select('notion_name')
-                    .eq('user_role', 'Gestor')
-                    .eq('project_name', targetProject); // Busca exata pelo nome do projeto
-                
-                if (managerError) {
-                    console.error("Erro ao buscar gestor:", managerError);
-                }
-
-                if (managersData && managersData.length > 0) {
-                    console.log("Gestores encontrados:", managersData);
-                    setProjectManagers(managersData.map(m => m.notion_name).filter(n => n !== profile.notion_name));
-                } else {
-                    console.warn(`Nenhum gestor encontrado no banco para o projeto: "${targetProject}"`);
-                }
             }
         } 
         
@@ -216,9 +254,32 @@ export default function Dashboard() {
     setEvaluatingMember(null);
   };
 
+  const handleSubmitSelfEvaluation = async (formData: SelfEvaluationFormData) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    const { error } = await supabase
+      .from("self_evaluations")
+      .upsert(
+        {
+          user_id: user.id,
+          week_of: getCycleDate(),
+          ...formData,
+        },
+        { onConflict: "user_id,week_of" }
+      );
+
+    if (error) throw error;
+    setSelfEvalStatus("done");
+  };
+
   const handleSubmitAll = async () => {
     if (!user || !profile) {
       alert("Erro de autenticação. Faça login novamente.");
+      return;
+    }
+
+    if (selfEvalStatus !== 'done') {
+      alert("Você precisa concluir sua autoavaliação antes de enviar as avaliações.");
       return;
     }
 
@@ -236,11 +297,7 @@ export default function Dashboard() {
       ([memberName, formData]) => {
         let type = 'member';
         
-        if (
-            projectManagers.includes(memberName) || 
-            sectorDirectors.includes(memberName) || 
-            gestorDirectors.includes(memberName)
-        ) {
+        if (sectorDirectors.includes(memberName) || gestorDirectors.includes(memberName)) {
             type = 'director';
         }
 
@@ -264,6 +321,10 @@ export default function Dashboard() {
     } else {
       alert(`Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`);
       setPendingEvaluations(new Map());
+      
+      // Atualiza imediatamente o banner visual para em dia
+      setEvaluationStatus('up-to-date');
+
       if (user) {
         localStorage.removeItem(`pendingEvals_${user.id}`);
       }
@@ -283,7 +344,7 @@ export default function Dashboard() {
   // Cálculo total para o StatusEvaluation
   let totalMembersCount = 0;
   if (profile.user_role === 'Membro') {
-      totalMembersCount = projectManagers.length + sectorDirectors.length;
+      totalMembersCount = sectorDirectors.length;
   } else if (profile.user_role === 'Gestor') {
       totalMembersCount = (viewMode === 'team' ? teamMembers.length : gestorDirectors.length);
   } else {
@@ -294,7 +355,7 @@ export default function Dashboard() {
     if (!profile) return [];
 
     if (profile.user_role === 'Membro') {
-      const nomes = [...projectManagers, ...sectorDirectors];
+      const nomes = [...sectorDirectors];
       return nomes.map((nome) => ({ nome, evaluationType: 'director' }));
     }
 
@@ -307,7 +368,6 @@ export default function Dashboard() {
 
     return teamMembers.map((nome) => ({ nome, evaluationType: 'member' }));
   })();
-
 
   const reviewItems = reviewTargets.map(({ nome, evaluationType }) => ({
     nome,
@@ -331,7 +391,6 @@ export default function Dashboard() {
     },
   }));
 
-
   return (
     <div className="min-h-screen bg-azulEscuroPage text-gray-200 relative pb-24">
       <div className="p-8 pt-2 mx-auto">
@@ -340,6 +399,40 @@ export default function Dashboard() {
             logout={handleLogout} 
             deleteAccount={handleDeleteAccount} 
         />
+        
+        {/* --- AUTOAVALIAÇÃO (botão/badge do ciclo atual) --- */}
+        <div className="flex justify-center mt-6">
+          {selfEvalStatus === 'done' ? (
+            <div className="flex items-center gap-2 px-6 py-3 bg-azulEscuroCard border border-green-500/40 rounded-lg text-green-400 font-medium">
+              <span className="w-2 h-2 rounded-full bg-green-400"></span>
+              Autoavaliação concluída
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsSelfEvalOpen(true)}
+              className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
+            >
+              Realizar Autoavaliação
+            </button>
+          )}
+        </div>
+
+        {/* BANNER DE AVISO DE PERIODICIDADE */}
+        {evaluationStatus && (
+            <div className={`mt-4 px-4 py-3 rounded-lg flex items-center justify-center font-medium border shadow-sm transition-all ${
+                evaluationStatus === 'up-to-date' 
+                ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                : 'bg-laranja/10 text-laranja border-laranja/20'
+            }`}>
+                {evaluationStatus === 'up-to-date' 
+                    ? "✅ Avaliação em dia" 
+                    : (profile.user_role === 'Diretor' 
+                        ? "⚠️ Avaliação pendente na semana" 
+                        : "⚠️ Avaliação quinzenal pendente"
+                    )
+                }
+            </div>
+        )}
         
         {loadingMembers ? (
             <div className="mt-10 text-center text-gray-400 animate-pulse">
@@ -360,29 +453,11 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* --- RENDERIZAÇÃO PARA MEMBRO (2 Linhas Separadas) --- */}
+                {/* --- RENDERIZAÇÃO PARA MEMBRO --- */}
                 {profile.user_role === 'Membro' ? (
-                    <div className="flex flex-col gap-8">
-                        
-                        {/* Linha 1: Gestor do Projeto */}
-                        {projectManagers.length > 0 ? (
-                            <Project
-                                nome={localProjectName || "Projeto"} 
-                                membros={projectManagers}
-                                evaluate={setEvaluatingMember}
-                                submit={handleSubmitAll}
-                                loading={isSubmitting}
-                                onReview={() => setIsReviewOpen(true)}
-                            />
-                        ) : (
-                            <div className="text-center text-gray-500 mt-4 text-sm border border-dashed border-gray-700 rounded p-4">
-                                <p>Nenhum gestor encontrado para o projeto: <strong>{localProjectName || "?"}</strong></p>
-                                <p className="text-xs mt-1">(Verifique se o Gestor já criou a conta e se o nome do projeto está idêntico no Notion)</p>
-                            </div>
-                        )}
-
-                        {/* Linha 2: Diretor da Assessoria */}
-                        {sectorDirectors.length > 0 && (
+                    <div className="flex flex-col gap-8 mt-6">
+                        {/* Linha: Diretor da Assessoria */}
+                        {sectorDirectors.length > 0 ? (
                             <Project
                                 nome={`Diretor (${profile.assessoria})`}
                                 membros={sectorDirectors}
@@ -391,6 +466,10 @@ export default function Dashboard() {
                                 loading={isSubmitting}
                                 onReview={() => setIsReviewOpen(true)}
                             />
+                        ) : (
+                            <div className="text-center text-gray-500 mt-4 text-sm border border-dashed border-gray-700 rounded p-4">
+                                <p>Nenhum diretor encontrado para a assessoria: <strong>{profile.assessoria}</strong></p>
+                            </div>
                         )}
                     </div>
                 ) : (
@@ -421,22 +500,24 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        <Project
-                            nome={
-                                profile.user_role === 'Diretor' ? profile.assessoria :
-                                (viewMode === 'team' ? (localProjectName || "Projeto") : `Diretoria (${profile.assessoria})`)
-                            }
-                            membros={
-                                profile.user_role === 'Gestor' && viewMode === 'director' 
-                                ? gestorDirectors 
-                                : teamMembers
-                            }
-                            evaluate={setEvaluatingMember}
-                            submit={handleSubmitAll}
-                            loading={isSubmitting}
-                            onEditTitle={(profile.user_role === 'Gestor' && viewMode === 'team') ? handleEditProjectName : undefined}
-                            onReview={() => setIsReviewOpen(true)}
-                        />
+                        <div className="mt-6">
+                            <Project
+                                nome={
+                                    profile.user_role === 'Diretor' ? profile.assessoria :
+                                    (viewMode === 'team' ? (localProjectName || "Projeto") : `Diretoria (${profile.assessoria})`)
+                                }
+                                membros={
+                                    profile.user_role === 'Gestor' && viewMode === 'director' 
+                                    ? gestorDirectors 
+                                    : teamMembers
+                                }
+                                evaluate={setEvaluatingMember}
+                                submit={handleSubmitAll}
+                                loading={isSubmitting}
+                                onEditTitle={(profile.user_role === 'Gestor' && viewMode === 'team') ? handleEditProjectName : undefined}
+                                onReview={() => setIsReviewOpen(true)}
+                            />
+                        </div>
                         
                         {teamMembers.length === 0 && (profile.user_role !== 'Gestor' || viewMode === 'team') && (
                             <p className="text-center text-gray-500 mt-4">Ninguém encontrado nesta categoria.</p>
@@ -460,9 +541,7 @@ export default function Dashboard() {
           onClose={() => setEvaluatingMember(null)}
           onSubmit={handleSaveEvaluation}
           evaluationType={
-            (projectManagers.includes(evaluatingMember) || 
-             sectorDirectors.includes(evaluatingMember) || 
-             gestorDirectors.includes(evaluatingMember)) 
+            (sectorDirectors.includes(evaluatingMember) || gestorDirectors.includes(evaluatingMember)) 
              ? 'director' 
              : 'member'
           }
@@ -475,6 +554,14 @@ export default function Dashboard() {
         items={reviewItems}
         title="Resumo das avaliações atuais"
       />
+
+      {isSelfEvalOpen && (
+        <SelfEvaluationModal
+          userName={profile.notion_name}
+          onClose={() => setIsSelfEvalOpen(false)}
+          onSubmit={handleSubmitSelfEvaluation}
+        />
+      )}
 
     </div>
   );
