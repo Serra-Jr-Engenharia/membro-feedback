@@ -7,7 +7,7 @@ import Header from "../components/Header";
 import Project from "../components/Project/Project";
 import StatusEvaluation from "../components/StatusEvaluation";
 import { useNavigate } from "react-router-dom";
-import { FaChartLine } from "react-icons/fa";
+import { FaChartLine, FaCheckCircle, FaExclamationTriangle, FaClipboardCheck, FaUserTie, FaUsers } from "react-icons/fa";
 import ReviewModal from "../components/ReviewModal";
 import SelfEvaluationModal from "../components/SelfEvaluationModal";
 import type { SelfEvaluationFormData } from "../components/SelfEvaluationModal";
@@ -392,60 +392,93 @@ export default function Dashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-azulEscuroPage text-gray-200 relative pb-24">
-      <div className="p-8 pt-2 mx-auto">
+    <div className="min-h-screen bg-azulEscuroPage text-gray-200 relative overflow-x-hidden">
+      {/* Glow decorativo de fundo */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-azulClaroCheck/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-laranja/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-2">
         <Header 
             nome={profile.notion_name} 
             logout={handleLogout} 
             deleteAccount={handleDeleteAccount} 
         />
-        
-        {/* --- AUTOAVALIAÇÃO (botão/badge do ciclo atual) --- */}
-        <div className="flex justify-center mt-6">
+      </div>
+
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-32 flex flex-col gap-10">
+
+        {/* --- HERO SECTION --- */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          <div className="flex flex-col justify-center gap-3">
+            <span className="text-xs font-semibold uppercase tracking-widest text-azulClaroCheck">Painel de Feedback</span>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Visão Geral</h1>
+            <p className="text-gray-400 max-w-md">
+              Acompanhe seus ciclos de avaliação, dê feedback à sua equipe e mantenha o time alinhado com excelência.
+            </p>
+          </div>
+
+          {/* --- AUTOAVALIAÇÃO (botão/badge do ciclo atual) --- */}
           {selfEvalStatus === 'done' ? (
-            <div className="flex items-center gap-2 px-6 py-3 bg-azulEscuroCard border border-green-500/40 rounded-lg text-green-400 font-medium">
-              <span className="w-2 h-2 rounded-full bg-green-400"></span>
-              Autoavaliação concluída
+            <div className="flex items-center gap-4 px-6 py-5 bg-green-500/10 border border-green-500/30 rounded-2xl text-green-400 font-medium shadow-lg">
+              <span className="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.6)] shrink-0"></span>
+              <div>
+                <p className="text-white font-semibold">Autoavaliação concluída</p>
+                <p className="text-sm text-green-400/80">Você já registrou sua reflexão deste ciclo.</p>
+              </div>
             </div>
           ) : (
             <button
               onClick={() => setIsSelfEvalOpen(true)}
-              className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
+              className="cursor-pointer flex items-center justify-between gap-4 px-6 py-5 bg-linear-to-br from-azulEscuroCard to-[#001A33] border border-laranja/40 rounded-2xl text-white font-medium hover:border-laranja transition-all shadow-[0_0_20px_rgba(255,102,0,0.2)] hover:shadow-[0_0_30px_rgba(255,102,0,0.35)] group"
             >
-              Realizar Autoavaliação
+              <div className="text-left">
+                <p className="text-lg font-bold">Realizar Autoavaliação</p>
+                <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">Reserve um instante para refletir sobre seu ciclo.</p>
+              </div>
+              <FaClipboardCheck className="text-3xl text-laranja shrink-0" />
             </button>
           )}
-        </div>
+        </section>
 
         {/* BANNER DE AVISO DE PERIODICIDADE */}
         {evaluationStatus && (
-            <div className={`mt-4 px-4 py-3 rounded-lg flex items-center justify-center font-medium border shadow-sm transition-all ${
+            <div className={`animate-fade-in backdrop-blur-md bg-white/5 px-5 py-4 rounded-2xl flex items-center gap-3 font-medium border shadow-lg transition-all ${
                 evaluationStatus === 'up-to-date' 
-                ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                : 'bg-laranja/10 text-laranja border-laranja/20'
+                ? 'border-green-500/30 text-green-400' 
+                : 'border-laranja/40 text-laranja'
             }`}>
-                {evaluationStatus === 'up-to-date' 
-                    ? "✅ Avaliação em dia" 
-                    : (profile.user_role === 'Diretor' 
-                        ? "⚠️ Avaliação pendente na semana" 
-                        : "⚠️ Avaliação quinzenal pendente"
-                    )
-                }
+                {evaluationStatus === 'up-to-date' ? (
+                    <FaCheckCircle className="text-xl shrink-0" />
+                ) : (
+                    <FaExclamationTriangle className="text-xl shrink-0" />
+                )}
+                <span>
+                    {evaluationStatus === 'up-to-date' 
+                        ? "Avaliação em dia" 
+                        : (profile.user_role === 'Diretor' 
+                            ? "Avaliação pendente na semana" 
+                            : "Avaliação quinzenal pendente"
+                        )
+                    }
+                </span>
             </div>
         )}
         
         {loadingMembers ? (
-            <div className="mt-10 text-center text-gray-400 animate-pulse">
-                Buscando dados...
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
+                <div className="w-10 h-10 border-2 border-azulClaroCheck border-t-transparent rounded-full animate-spin"></div>
+                <p className="animate-pulse">Buscando dados...</p>
             </div>
         ) : (
-            <>
+            <div className="flex flex-col gap-10">
                 {/* --- BOTÃO DE ANALYTICS PARA RH --- */}
                 {profile.assessoria === 'Recursos Humanos' && (
-                    <div className="flex justify-center mt-6">
+                    <div className="flex justify-center">
                         <button
                             onClick={() => navigate('/analytics')}
-                            className="flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
+                            className="flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder/50 rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
                         >
                             <FaChartLine className="text-laranja group-hover:text-azulEscuroPage transition-colors" />
                             Acessar Painel de Analytics
@@ -455,52 +488,57 @@ export default function Dashboard() {
 
                 {/* --- RENDERIZAÇÃO PARA MEMBRO --- */}
                 {profile.user_role === 'Membro' ? (
-                    <div className="flex flex-col gap-8 mt-6">
+                    <div className="flex flex-col gap-8">
                         {/* Linha: Diretor da Assessoria */}
                         {sectorDirectors.length > 0 ? (
-                            <Project
-                                nome={`Diretor (${profile.assessoria})`}
-                                membros={sectorDirectors}
-                                evaluate={setEvaluatingMember}
-                                submit={handleSubmitAll}
-                                loading={isSubmitting}
-                                onReview={() => setIsReviewOpen(true)}
-                            />
+                            <div className="bg-azulEscuroCard p-6 sm:p-8 rounded-3xl border border-[#001A33] shadow-xl">
+                                <Project
+                                    nome={`Diretor (${profile.assessoria})`}
+                                    membros={sectorDirectors}
+                                    evaluate={setEvaluatingMember}
+                                    submit={handleSubmitAll}
+                                    loading={isSubmitting}
+                                    onReview={() => setIsReviewOpen(true)}
+                                />
+                            </div>
                         ) : (
-                            <div className="text-center text-gray-500 mt-4 text-sm border border-dashed border-gray-700 rounded p-4">
-                                <p>Nenhum diretor encontrado para a assessoria: <strong>{profile.assessoria}</strong></p>
+                            <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 border-2 border-dashed border-[#001A33] rounded-3xl bg-azulEscuroCard/40 text-center">
+                                <FaUserTie className="text-4xl text-gray-600" />
+                                <p className="text-gray-400">Nenhum diretor encontrado para a assessoria: <strong className="text-gray-300">{profile.assessoria}</strong></p>
                             </div>
                         )}
                     </div>
                 ) : (
                     // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR ---
-                    <>
+                    <div className="flex flex-col gap-6">
                         {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
-                            <div className="flex justify-center gap-4 my-6">
-                                <button
-                                    onClick={() => setViewMode('team')}
-                                    className={`px-6 py-2 rounded-full font-medium transition-all ${
-                                        viewMode === 'team' 
-                                        ? 'bg-laranja text-white shadow-lg scale-105' 
-                                        : 'bg-azulEscuroCard text-gray-400 border border-azulClaroBorder hover:bg-opacity-80'
-                                    }`}
-                                >
-                                    Avaliar Equipe
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('director')}
-                                    className={`px-6 py-2 rounded-full font-medium transition-all ${
-                                        viewMode === 'director' 
-                                        ? 'bg-laranja text-white shadow-lg scale-105' 
-                                        : 'bg-azulEscuroCard text-gray-400 border border-azulClaroBorder hover:bg-opacity-80'
-                                    }`}
-                                >
-                                    Avaliar Diretor
-                                </button>
+                            <div className="flex justify-center">
+                                <div className="bg-azulEscuroPage p-1.5 rounded-xl inline-flex border border-[#001A33] gap-1">
+                                    <button
+                                        onClick={() => setViewMode('team')}
+                                        className={`cursor-pointer px-6 py-2 rounded-lg font-medium transition-all ${
+                                            viewMode === 'team' 
+                                            ? 'bg-laranja text-white shadow-lg' 
+                                            : 'text-gray-500 hover:text-white'
+                                        }`}
+                                    >
+                                        Avaliar Equipe
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('director')}
+                                        className={`cursor-pointer px-6 py-2 rounded-lg font-medium transition-all ${
+                                            viewMode === 'director' 
+                                            ? 'bg-laranja text-white shadow-lg' 
+                                            : 'text-gray-500 hover:text-white'
+                                        }`}
+                                    >
+                                        Avaliar Diretor
+                                    </button>
+                                </div>
                             </div>
                         )}
 
-                        <div className="mt-6">
+                        <div className="bg-azulEscuroCard p-6 sm:p-8 rounded-3xl border border-[#001A33] shadow-xl">
                             <Project
                                 nome={
                                     profile.user_role === 'Diretor' ? profile.assessoria :
@@ -520,19 +558,25 @@ export default function Dashboard() {
                         </div>
                         
                         {teamMembers.length === 0 && (profile.user_role !== 'Gestor' || viewMode === 'team') && (
-                            <p className="text-center text-gray-500 mt-4">Ninguém encontrado nesta categoria.</p>
+                            <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 border-2 border-dashed border-[#001A33] rounded-3xl bg-azulEscuroCard/40 text-center">
+                                <FaUsers className="text-4xl text-gray-600" />
+                                <p className="text-gray-400">Ninguém encontrado nesta categoria.</p>
+                            </div>
                         )}
-                    </>
+                    </div>
                 )}
-            </>
+            </div>
         )}
-      </div>
 
-      <StatusEvaluation
-        totalMembers={totalMembersCount}
-        evaluated={Array.from(pendingEvaluations.keys()).length}
-        pending={totalMembersCount - Array.from(pendingEvaluations.keys()).length}
-      />
+        {/* --- RODAPÉ DE STATUS --- */}
+        <div className="flex justify-center pt-4">
+          <StatusEvaluation
+            totalMembers={totalMembersCount}
+            evaluated={Array.from(pendingEvaluations.keys()).length}
+            pending={totalMembersCount - Array.from(pendingEvaluations.keys()).length}
+          />
+        </div>
+      </main>
 
       {evaluatingMember && (
         <EvaluationModal

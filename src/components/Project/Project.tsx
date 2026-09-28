@@ -1,7 +1,4 @@
-import { useCallback } from "react";
-import useEmblaCarousel from "embla-carousel-react";
 import { FaPen } from "react-icons/fa";
-import arrowIcon from "../../assets/left.svg";
 import Card from "./Card";
 import Button from "./Button";
 
@@ -24,78 +21,62 @@ export default function Project({
   onEditTitle,
   onReview,
 }: ProjectProps) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    align: "start",
-    loop: false,
-    slidesToScroll: 2,
-    dragFree: false,
-  });
-
-  const scrollPrev = useCallback(() => {
-    emblaApi?.scrollPrev();
-  }, [emblaApi]);
-
-  const scrollNext = useCallback(() => {
-    emblaApi?.scrollNext();
-  }, [emblaApi]);
-
+  
   return (
-    <div className="flex flex-col font-poppins text-white font-medium text-2xl gap-1 pt-10">
+    <div className="flex flex-col font-poppins text-white w-full gap-6 pt-6 animate-fade-in">
       
-      <div className="flex items-center gap-3 group">
-        <h2 className="text-white">{nome || "Projeto"}</h2> 
-        {onEditTitle && (
-          <button 
-            onClick={onEditTitle}
-            className="text-gray-500 hover:text-laranja transition-colors text-lg opacity-0 group-hover:opacity-100 p-1"
-            title="Alterar nome do projeto"
-          >
-            <FaPen />
-          </button>
-        )}
-      </div>
-      
-      <hr className="bg-laranja w-[350px] h-0.5 border-none outline-0" />
-
-      <div className="flex gap-4 items-center">
-        <button type="button" onClick={scrollPrev} className="p-2 rounded-full transition-colors">
-          <img
-            src={arrowIcon}
-            className="max-h-[22px] max-w-[15px] cursor-pointer"
-            alt="Anterior"
-          />
-        </button>
-
-        <div
-          ref={emblaRef}
-          className="overflow-x-hidden overflow-y-visible pr-4"
-        >
-          <div className="flex gap-6 py-2 pl-2">
-            {membros.map((membroNome, idx) => (
-              <div
-                key={idx}
-                className="shrink-0 flex justify-center items-center"
-              >
-                <Card nome={membroNome} evaluate={() => evaluate(membroNome)} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <button type="button" onClick={scrollNext} className="p-2 rounded-fulltransition-colors">
-          <img
-            src={arrowIcon}
-            className="max-h-[22px] max-w-[15px] cursor-pointer rotate-180"
-            alt="Próximo"
-          />
-        </button>
-
-        <div className="flex flex-col gap-2">
-          <Button tipo={1} submit={submit} onReview={onReview} /> 
-          <Button tipo={0} submit={submit} loading={loading} />
+      {/* Cabeçalho da Seção */}
+      <div className="flex items-center justify-between border-b border-[#001A33] pb-3">
+        <div className="flex items-center gap-3 group">
+          <h2 className="text-2xl font-bold text-white tracking-wide">
+            {nome || "Equipe"}
+          </h2> 
+          {onEditTitle && (
+            <button 
+              onClick={onEditTitle}
+              className="text-gray-500 hover:text-laranja transition-colors text-lg opacity-0 group-hover:opacity-100 p-2 rounded-full hover:bg-white/5"
+              title="Alterar nome do projeto"
+            >
+              <FaPen />
+            </button>
+          )}
         </div>
         
+        {/* Badge de Contagem */}
+        <span className="bg-[#001A33] text-azulClaroCheck text-sm font-semibold px-3 py-1 rounded-full border border-azulClaroBorder/30">
+          {membros.length} {membros.length === 1 ? 'membro' : 'membros'}
+        </span>
       </div>
+
+      {/* Grid de Cards (Substituindo o Carrossel) */}
+      {membros.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
+          {membros.map((membroNome, idx) => (
+            <div key={idx} className="w-full flex justify-center sm:justify-start">
+              {/* O componente Card precisará ter largura 100% no arquivo dele para preencher o grid */}
+              <Card nome={membroNome} evaluate={() => evaluate(membroNome)} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-[#001A33] rounded-2xl bg-azulEscuroPage/50">
+          <span className="text-4xl mb-3">👻</span>
+          <p className="text-gray-400 text-center">Ninguém para avaliar nesta seção.</p>
+        </div>
+      )}
+
+      {/* Ações (Botões de Envio e Revisão) */}
+      {membros.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-4 mt-4 pt-6 border-t border-[#001A33] w-full justify-end">
+          <div className="w-full sm:w-auto">
+            <Button tipo={1} submit={submit} onReview={onReview} /> 
+          </div>
+          <div className="w-full sm:w-auto">
+            <Button tipo={0} submit={submit} loading={loading} />
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 }

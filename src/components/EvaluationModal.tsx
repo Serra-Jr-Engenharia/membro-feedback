@@ -14,7 +14,7 @@ export interface EvaluationFormData {
 
   rating_lideranca?: number;
   rating_flexibilidade?: number;
-  text_delegacao?: string; // "Todos", "Alguns", "Nenhum"
+  text_delegacao?: string;
 }
 
 type EvaluationModalProps = {
@@ -33,6 +33,9 @@ export default function EvaluationModal({
   initialData,
 }: EvaluationModalProps) {
   
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 3;
+
   const [comunicacao, setComunicacao] = useState(initialData?.rating_comunicacao || 0);
   const [proatividade, setProatividade] = useState(initialData?.rating_proatividade || 0);
   const [comments, setComments] = useState(initialData?.comments || "");
@@ -83,6 +86,14 @@ export default function EvaluationModal({
     localStorage.setItem(`draft_eval_${memberName}`, JSON.stringify(draft));
   }, [comunicacao, proatividade, comments, participacao, relacao, metas, isDestaque, lideranca, flexibilidade, delegacao, memberName]);
 
+  const handleNextStep = () => {
+    if (currentStep < totalSteps) setCurrentStep(currentStep + 1);
+  };
+
+  const handlePrevStep = () => {
+    if (currentStep > 1) setCurrentStep(currentStep - 1);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -108,119 +119,183 @@ export default function EvaluationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="p-6 font-poppins bg-[#001429] text-gray-200 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-[#001A33]">
-        <header className="flex justify-start items-center gap-3 mb-6 border-b border-[#001A33] pb-4">
-          <img src={userIcon} alt="Ícone" className="w-10 h-10" />
-          <div>
-            <h2 className="text-xl font-bold text-white">{memberName}</h2>
-            <span className="text-xs text-[#FF6600] uppercase tracking-wider font-semibold">
-              {evaluationType === 'member' ? 'Avaliação de Membro' : 'Avaliação de Liderança'}
-            </span>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md transition-opacity">
+      <div className="font-poppins bg-azulEscuroCard text-gray-200 rounded-2xl shadow-2xl w-full max-w-xl max-h-[95vh] flex flex-col border border-azulClaroBorder/30 overflow-hidden">
+        
+        {/* Cabecalho do Modal e Indicador de Progresso */}
+        <header className="p-6 bg-azulEscuroPage border-b border-[#001A33] shrink-0 relative">
+            <button 
+                onClick={onClose} 
+                className="absolute top-4 right-4 text-gray-400 hover:text-white cursor-pointer p-2 rounded-full hover:bg-white/5 transition-colors"
+                aria-label="Fechar"
+            >
+                ✕
+            </button>
+            <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-full bg-[#001A33] border border-azulClaroBorder/30 flex items-center justify-center p-2 shadow-[0_0_15px_rgba(13,180,224,0.1)]">
+                    <img src={userIcon} alt="Ícone" className="w-full h-full object-contain" />
+                </div>
+                <div>
+                <h2 className="text-xl font-bold text-white tracking-tight">{memberName}</h2>
+                <span className="text-xs text-laranja uppercase tracking-widest font-semibold flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-laranja"></span>
+                    {evaluationType === 'member' ? 'Avaliação de Membro' : 'Avaliação de Liderança'}
+                </span>
+                </div>
+            </div>
+
+            {/* Stepper Progress Bar */}
+            <div className="flex justify-between items-center relative mt-6">
+                <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-[#001A33] -z-10"></div>
+                <div 
+                    className="absolute left-0 top-1/2 h-0.5 bg-azulClaroCheck -z-10 transition-all duration-300 ease-in-out" 
+                    style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
+                ></div>
+                {[1, 2, 3].map((step) => (
+                    <div 
+                        key={step} 
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 shadow-lg ${
+                            currentStep >= step 
+                            ? 'bg-azulClaroCheck text-azulEscuroPage shadow-cyan-500/40 ring-4 ring-azulEscuroCard' 
+                            : 'bg-[#001A33] text-gray-500 ring-4 ring-azulEscuroCard'
+                        }`}
+                    >
+                        {step}
+                    </div>
+                ))}
+            </div>
         </header>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4 p-4 bg-[#000D1A] rounded-xl">
-            
-            {/* --- CAMPOS COMUNS --- */}
-            <div className="flex justify-between items-center">
-              <label className="text-gray-300">Comunicação:</label>
-              <StarRating rating={comunicacao} setRating={setComunicacao} />
-            </div>
-            <div className="flex justify-between items-center">
-              <label className="text-gray-300">Proatividade:</label>
-              <StarRating rating={proatividade} setRating={setProatividade} />
-            </div>
-
-            {/* --- CAMPOS DE MEMBRO --- */}
-            {evaluationType === 'member' && (
-              <>
-                <div className="flex justify-between items-center">
-                  <label className="text-gray-300">Participação:</label>
-                  <StarRating rating={participacao} setRating={setParticipacao} />
-                </div>
-                <div className="flex justify-between items-center">
-                  <label className="text-gray-300">Relação com grupo:</label>
-                  <StarRating rating={relacao} setRating={setRelacao} />
-                </div>
-                <div className="flex justify-between items-center">
-                  <label className="text-gray-300">Entrega de metas:</label>
-                  <StarRating rating={metas} setRating={setMetas} />
-                </div>
+        {/* Corpo Rolável */}
+        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+            <form id="evaluationForm" onSubmit={handleSubmit} className="space-y-6">
                 
-                {/* Destaque */}
-                <div className="pt-2 flex justify-between items-center border-t border-[#001A33] mt-2">
-                  <label className="text-gray-300">Membro destaque?</label>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setIsDestaque(true)} className={`cursor-pointer px-4 py-1 rounded text-sm transition-colors ${isDestaque ? 'bg-[#FF6600] text-white' : 'bg-[#001429] text-gray-400'}`}>Sim</button>
-                    <button type="button" onClick={() => setIsDestaque(false)} className={`cursor-pointer px-4 py-1 rounded text-sm transition-colors ${!isDestaque ? 'bg-gray-600 text-white' : 'bg-[#001429] text-gray-400'}`}>Não</button>
-                  </div>
+                {/* STEP 1: Fundamentos */}
+                <div className={`transition-all duration-300 ${currentStep === 1 ? 'block animate-fade-in' : 'hidden'}`}>
+                    <h3 className="text-lg font-semibold text-white mb-4 border-l-4 border-azulClaroCheck pl-3">Competências Base</h3>
+                    <div className="space-y-5 bg-azulEscuroPage/50 p-5 rounded-xl border border-white/5">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                            <label className="text-gray-300 font-medium">Comunicação</label>
+                            <StarRating rating={comunicacao} setRating={setComunicacao} />
+                        </div>
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-2 border-t border-white/5">
+                            <label className="text-gray-300 font-medium">Proatividade</label>
+                            <StarRating rating={proatividade} setRating={setProatividade} />
+                        </div>
+                    </div>
                 </div>
-              </>
-            )}
 
-            {/* --- CAMPOS DE LÍDER --- */}
-            {evaluationType === 'director' && (
-              <>
-                <div className="flex justify-between items-center">
-                  <label className="text-gray-300">Liderança:</label>
-                  <StarRating rating={lideranca} setRating={setLideranca} />
+                {/* STEP 2: Específicos */}
+                <div className={`transition-all duration-300 ${currentStep === 2 ? 'block animate-fade-in' : 'hidden'}`}>
+                    <h3 className="text-lg font-semibold text-white mb-4 border-l-4 border-laranja pl-3">Desempenho Específico</h3>
+                    <div className="space-y-5 bg-azulEscuroPage/50 p-5 rounded-xl border border-white/5">
+                    
+                    {evaluationType === 'member' ? (
+                        <>
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                                <label className="text-gray-300 font-medium">Participação</label>
+                                <StarRating rating={participacao} setRating={setParticipacao} />
+                            </div>
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-2 border-t border-white/5">
+                                <label className="text-gray-300 font-medium">Relação com grupo</label>
+                                <StarRating rating={relacao} setRating={setRelacao} />
+                            </div>
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-2 border-t border-white/5">
+                                <label className="text-gray-300 font-medium">Entrega de metas</label>
+                                <StarRating rating={metas} setRating={setMetas} />
+                            </div>
+                            
+                            <div className="pt-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-t border-[#001A33]">
+                                <div>
+                                    <label className="text-gray-200 font-medium block">Membro Destaque?</label>
+                                    <span className="text-xs text-gray-500">Indicaria essa pessoa pelo esforço excepcional?</span>
+                                </div>
+                                <div className="flex bg-[#001A33] rounded-lg p-1">
+                                    <button type="button" onClick={() => setIsDestaque(true)} className={`cursor-pointer px-5 py-1.5 rounded-md text-sm font-medium transition-all ${isDestaque ? 'bg-laranja text-white shadow-md' : 'text-gray-400 hover:text-white'}`}>Sim</button>
+                                    <button type="button" onClick={() => setIsDestaque(false)} className={`cursor-pointer px-5 py-1.5 rounded-md text-sm font-medium transition-all ${!isDestaque ? 'bg-gray-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}>Não</button>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                                <label className="text-gray-300 font-medium">Liderança</label>
+                                <StarRating rating={lideranca} setRating={setLideranca} />
+                            </div>
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-2 border-t border-white/5">
+                                <label className="text-gray-300 font-medium">Flexibilidade</label>
+                                <StarRating rating={flexibilidade} setRating={setFlexibilidade} />
+                            </div>
+                            
+                            <div className="pt-4 border-t border-[#001A33]">
+                                <label className="text-gray-200 font-medium block mb-3">Como delega atividades?</label>
+                                <div className="grid grid-cols-3 gap-2 bg-[#001A33] p-1 rounded-xl">
+                                    {['Todos', 'Alguns', 'Nenhum'].map((opt) => (
+                                        <button
+                                            key={opt}
+                                            type="button"
+                                            onClick={() => setDelegacao(opt)}
+                                            className={`py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                                delegacao === opt 
+                                                ? 'bg-azulClaroCheck text-azulEscuroPage shadow-md' 
+                                                : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                                            }`}
+                                        >
+                                            {opt}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                    </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <label className="text-gray-300">Flexibilidade:</label>
-                  <StarRating rating={flexibilidade} setRating={setFlexibilidade} />
-                </div>
-                
-                {/* Delegar Atividades */}
-                <div className="pt-2 border-t border-[#001A33] mt-2">
-                  <label className="text-gray-300 block mb-2">Delega atividades?</label>
-                  <div className="flex gap-2 w-full">
-                    {['Todos', 'Alguns', 'Nenhum'].map((opt) => (
-                       <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setDelegacao(opt)}
-                        className={`flex-1 py-2 rounded text-sm border border-[#001A33] transition-colors ${
-                          delegacao === opt ? 'bg-[#FF6600] text-white font-bold' : 'bg-[#001429] text-gray-400 hover:bg-[#001A33]'
-                        }`}
-                       >
-                         {opt}
-                       </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
 
-          <div>
-            <label className="text-gray-300 text-sm font-medium ml-1">Comentários:</label>
-            <textarea
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-              className="w-full p-3 mt-1 bg-[#000D1A] border border-[#001A33] text-white rounded-lg focus:border-[#FF6600] outline-none transition-colors"
-              rows={3}
-              placeholder="Escreva um feedback construtivo..."
-            />
-          </div>
+                {/* STEP 3: Conclusão */}
+                <div className={`transition-all duration-300 h-full flex flex-col ${currentStep === 3 ? 'block animate-fade-in' : 'hidden'}`}>
+                    <h3 className="text-lg font-semibold text-white mb-4 border-l-4 border-green-500 pl-3">Parecer Final</h3>
+                    <div className="flex-1 flex flex-col">
+                        <label className="text-gray-300 text-sm font-medium mb-2">Comentários e Feedbacks Adicionais</label>
+                        <textarea
+                            value={comments}
+                            onChange={(e) => setComments(e.target.value)}
+                            className="w-full flex-1 min-h-37.5 p-4 bg-azulEscuroPage/80 border border-[#001A33] text-white rounded-xl focus:border-azulClaroCheck focus:ring-1 focus:ring-azulClaroCheck outline-none transition-all placeholder-gray-600 resize-none"
+                            placeholder="Deixe um feedback construtivo detalhando os pontos fortes e os pontos a melhorar..."
+                        />
+                    </div>
+                </div>
 
-          <div className="flex w-full justify-end gap-3 pt-2">
+            </form>
+        </div>
+
+        {/* Rodapé e Navegação */}
+        <footer className="p-4 bg-azulEscuroPage border-t border-[#001A33] flex justify-between items-center shrink-0">
             <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer px-6 py-2 text-gray-400 hover:text-white transition-colors"
+                type="button"
+                onClick={currentStep === 1 ? onClose : handlePrevStep}
+                className="cursor-pointer px-5 py-2.5 text-gray-400 hover:text-white font-medium transition-colors"
             >
-              Cancelar
+                {currentStep === 1 ? 'Cancelar' : '← Voltar'}
             </button>
-            <button
-              type="submit"
-              className="cursor-pointer px-6 py-2 text-white bg-[#FF6600] rounded-lg hover:bg-opacity-90 transition-all font-medium shadow-lg shadow-orange-900/20"
-            >
-              Salvar
-            </button>
-          </div>
-        </form>
+
+            {currentStep < totalSteps ? (
+                <button
+                    type="button"
+                    onClick={handleNextStep}
+                    className="cursor-pointer px-6 py-2.5 bg-[#001A33] text-azulClaroCheck border border-azulClaroBorder/50 hover:bg-azulClaroCheck hover:text-azulEscuroPage rounded-lg transition-all font-semibold shadow-lg"
+                >
+                    Próximo Passo
+                </button>
+            ) : (
+                <button
+                    type="submit"
+                    form="evaluationForm"
+                    className="cursor-pointer px-8 py-2.5 bg-laranja text-white rounded-lg hover:bg-orange-500 transition-all font-bold shadow-[0_0_15px_rgba(255,102,0,0.3)] hover:shadow-[0_0_20px_rgba(255,102,0,0.5)] transform hover:-translate-y-0.5"
+                >
+                    Finalizar Avaliação
+                </button>
+            )}
+        </footer>
       </div>
     </div>
   );
