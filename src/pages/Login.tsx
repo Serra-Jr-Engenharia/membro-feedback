@@ -15,7 +15,7 @@ export default function Login() {
     setLoading(true)
     setError(null)
     
-    const { error: signInError } = await supabase.auth.signInWithPassword({ 
+    const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({ 
       email, 
       password 
     })
@@ -23,8 +23,22 @@ export default function Login() {
     if (signInError) {
       setError(signInError.message)
       setLoading(false)
-    } else {
-      navigate('/')
+      return
+    }
+
+    if (authData.user) {
+      // Busca a role do usuário recém-logado
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_role')
+        .eq('id', authData.user.id)
+        .single()
+
+      if (profile?.user_role === 'Admin') {
+        navigate('/admin')
+      } else {
+        navigate('/')
+      }
     }
   }
 
