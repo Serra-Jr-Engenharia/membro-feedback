@@ -1,5 +1,3 @@
-// supabase/functions/delete-account/index.ts
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -9,13 +7,11 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
-  // 1. Lidar com CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // 2. Criar um cliente Supabase "Normal" para ver QUEM está chamando
     const authHeader = req.headers.get('Authorization')!
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -23,29 +19,43 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    // Pega o usuário logado (token JWT)
+    // 1. Pega o usuário que clicou no botão (quem está logado)
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+    if (userError || !user) throw new Error('Não autorizado: Você precisa estar logado.')
 
-    if (userError || !user) {
-      throw new Error('Não autorizado: Você precisa estar logado para excluir sua conta.')
-    }
-
-    // 3. Criar um cliente Supabase "Admin" (Service Role) para DELETAR
-    // A chave SERVICE_ROLE_KEY tem poder total (cuidado!)
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log(`Excluindo usuário: ${user.id} (${user.email})`)
+    // 2. Verifica se um ID de terceiro foi enviado no body da requisição
+    let targetUserId = user.id
+    try {
+      const body = await req.json()
+      if (body?.targetUserId) {
+        targetUserId = body.targetUserId
+      }
+    } catch (_) {
+      // Se o body estiver vazio, segue o fluxo mantendo o targetUserId como o do próprio usuário
+    }
 
-    // Deleta o usuário da tabela auth.users
-    // (Isso deve apagar o perfil em cascata se sua FK estiver configurada com ON DELETE CASCADE,
-    // mas mesmo se não estiver, o login será removido).
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
-      user.id
-    )
+    // 3. Trava de Segurança: Se estiver tentando apagar outra pessoa, TEM que ser Admin
+    if (targetUserId !== user.id) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('user_role')
+        .eq('id', user.id)
+        .single()
 
+      if (profile?.user_role !== 'Admin') {
+        throw new Error('Acesso negado: Somente o setor de RH pode excluir contas de terceiros.')
+      }
+    }
+
+    console.log(`Excluindo usuário ID: ${targetUserId} (Solicitado por: ${user.id})`)
+
+    // 4. Executa a exclusão com privilégios máximos
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId)
     if (deleteError) throw deleteError
 
     return new Response(JSON.stringify({ message: 'Conta excluída com sucesso.' }), {
@@ -57,7 +67,7 @@ Deno.serve(async (req) => {
     console.error('Erro ao excluir conta:', error)
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400, // Bad Request
+      status: 400, 
     })
   }
 })

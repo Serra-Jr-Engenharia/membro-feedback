@@ -16,11 +16,9 @@ import { getEvaluationStatus } from "../utils/evaluationStatus";
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 type ViewMode = 'team' | 'director';
 
-// Retorna a segunda-feira da semana ISO atual (formato YYYY-MM-DD), mesma base do week_of das avaliações.
-// Ajuste aqui caso queira aplicar o ciclo quinzenal dos Membros.
 function getCycleDate(): string {
   const now = new Date();
-  const day = (now.getDay() + 6) % 7; // 0 = segunda, ... 6 = domingo
+  const day = (now.getDay() + 6) % 7;
   const monday = new Date(now);
   monday.setDate(now.getDate() - day);
   return monday.toISOString().split("T")[0];
@@ -30,7 +28,6 @@ export default function Dashboard() {
   const { profile, user } = useAuth();
   const navigate = useNavigate();
   
-  // Estados para as listas
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [sectorDirectors, setSectorDirectors] = useState<string[]>([]); 
   const [gestorDirectors, setGestorDirectors] = useState<string[]>([]);
@@ -47,7 +44,6 @@ export default function Dashboard() {
 
   const [selfEvalStatus, setSelfEvalStatus] = useState<'loading' | 'done' | 'pending'>('loading');
   const [isSelfEvalOpen, setIsSelfEvalOpen] = useState(false);
-  // Estado da periodicidade 
   const [evaluationStatus, setEvaluationStatus] = useState<'pending' | 'up-to-date' | null>(null);
 
   useEffect(() => {
@@ -76,7 +72,6 @@ export default function Dashboard() {
     }
   }, [pendingEvaluations, user, isPendingLoaded]);
 
-  // Novo useEffect refatorado
   useEffect(() => {
     const checkEvaluationStatus = async () => {
       if (!user || !profile) return;
@@ -95,8 +90,6 @@ export default function Dashboard() {
       }
 
       const lastEvalDateStr = data && data.length > 0 ? data[0].created_at : null;
-
-      // Usa a função helper pura e elegante!
       const status = getEvaluationStatus(profile.user_role, lastEvalDateStr);
       setEvaluationStatus(status);
     };
@@ -135,7 +128,6 @@ export default function Dashboard() {
         let notionMembersList: string[] = [];
         let discoveredProjectName: string | null = null;
 
-        // 1. BUSCA DA EQUIPE NO NOTION
         const projectFilter = profile.user_role === 'Gestor' ? (localProjectName || profile.project_name) : null;
 
         const { data: notionData, error: notionError } = await supabase.functions.invoke(
@@ -162,9 +154,6 @@ export default function Dashboard() {
             }
           }
 
-        // 2. LÓGICA DE BUSCA DE LÍDERES
-        
-        // --- CENÁRIO: MEMBRO ---
         if (profile.user_role === 'Membro') {
             const { data: directorsData } = await supabase
                 .from('profiles')
@@ -176,8 +165,6 @@ export default function Dashboard() {
                 setSectorDirectors(directorsData.map(d => d.notion_name).filter(n => n !== profile.notion_name));
             }
         } 
-        
-        // --- CENÁRIO: GESTOR ---
         else if (profile.user_role === 'Gestor') {
             setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
 
@@ -191,8 +178,6 @@ export default function Dashboard() {
                 setGestorDirectors(directorData.map(d => d.notion_name).filter(name => name !== profile.notion_name));
             }
         }
-        
-        // --- CENÁRIO: DIRETOR ---
         else if (profile.user_role === 'Diretor') {
              setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
         }
@@ -224,25 +209,6 @@ export default function Dashboard() {
             setLocalProjectName(newName);
             alert("Projeto atualizado! Lembre-se que a tag no Notion deve ser igual.");
         }
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    const confirm1 = window.confirm("TEM CERTEZA que deseja excluir sua conta?");
-    if (!confirm1) return;
-    const confirm2 = window.confirm("Essa ação é IRREVERSÍVEL. Deseja continuar?");
-    if (!confirm2) return;
-
-    try {
-      const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
-      if (error) throw error;
-      alert("Sua conta foi excluída com sucesso.");
-      await supabase.auth.signOut();
-      navigate('/login');
-    } catch (err: unknown) {
-      console.error("Erro:", err);
-      const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
-      alert("Erro ao excluir conta: " + errorMessage);
     }
   };
 
@@ -321,8 +287,6 @@ export default function Dashboard() {
     } else {
       alert(`Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`);
       setPendingEvaluations(new Map());
-      
-      // Atualiza imediatamente o banner visual para em dia
       setEvaluationStatus('up-to-date');
 
       if (user) {
@@ -341,7 +305,6 @@ export default function Dashboard() {
     );
   }
 
-  // Cálculo total para o StatusEvaluation
   let totalMembersCount = 0;
   if (profile.user_role === 'Membro') {
       totalMembersCount = sectorDirectors.length;
@@ -397,10 +360,8 @@ export default function Dashboard() {
         <Header 
             nome={profile.notion_name} 
             logout={handleLogout} 
-            deleteAccount={handleDeleteAccount} 
         />
         
-        {/* --- AUTOAVALIAÇÃO (botão/badge do ciclo atual) --- */}
         <div className="flex justify-center mt-6">
           {selfEvalStatus === 'done' ? (
             <div className="flex items-center gap-2 px-6 py-3 bg-azulEscuroCard border border-green-500/40 rounded-lg text-green-400 font-medium">
@@ -417,7 +378,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* BANNER DE AVISO DE PERIODICIDADE */}
         {evaluationStatus && (
             <div className={`mt-4 px-4 py-3 rounded-lg flex items-center justify-center font-medium border shadow-sm transition-all ${
                 evaluationStatus === 'up-to-date' 
@@ -440,7 +400,6 @@ export default function Dashboard() {
             </div>
         ) : (
             <>
-                {/* --- BOTÃO DE ANALYTICS PARA RH --- */}
                 {profile.assessoria === 'Recursos Humanos' && (
                     <div className="flex justify-center mt-6">
                         <button
@@ -453,10 +412,8 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* --- RENDERIZAÇÃO PARA MEMBRO --- */}
                 {profile.user_role === 'Membro' ? (
                     <div className="flex flex-col gap-8 mt-6">
-                        {/* Linha: Diretor da Assessoria */}
                         {sectorDirectors.length > 0 ? (
                             <Project
                                 nome={`Diretor (${profile.assessoria})`}
@@ -473,7 +430,6 @@ export default function Dashboard() {
                         )}
                     </div>
                 ) : (
-                    // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR ---
                     <>
                         {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
                             <div className="flex justify-center gap-4 my-6">
