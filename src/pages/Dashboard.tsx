@@ -469,8 +469,8 @@ export default function Dashboard() {
                         )}
                     </div>
                 ) : (
-                    {/* --- RENDERIZAÇÃO PARA GESTOR E DIRETOR --- */}
                     <div className="flex flex-col gap-6">
+                        {/* --- RENDERIZAÇÃO PARA GESTOR E DIRETOR --- */}
                         {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
                             <div className="flex justify-center">
                                 <div className="bg-azulEscuroPage p-1.5 rounded-xl inline-flex border border-[#001A33] gap-1">
