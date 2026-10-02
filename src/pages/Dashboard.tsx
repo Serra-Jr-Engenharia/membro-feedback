@@ -50,7 +50,7 @@ export default function Dashboard() {
     if (profile?.project_name) {
         setLocalProjectName(profile.project_name);
     }
-  }, [profile]);
+  }, [profile?.project_name]);
 
   useEffect(() => {
     if (user && !isPendingLoaded) {
@@ -148,7 +148,7 @@ export default function Dashboard() {
           } else {
             notionMembersList = [...(notionData.members || [])];
             
-            if (notionData.detected_project) {
+            if (notionData.detected_project && notionData.detected_project !== localProjectName) {
                 discoveredProjectName = notionData.detected_project;
                 setLocalProjectName(discoveredProjectName || ""); 
             }
