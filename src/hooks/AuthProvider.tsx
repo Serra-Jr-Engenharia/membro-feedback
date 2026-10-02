@@ -10,68 +10,61 @@ export interface Profile {
   user_role: string;
   project_name: string | null;
   assessoria: string;
+  email?: string;
 }
+
 interface AuthContextType {
   session: Session | null
   user: User | null
   profile: Profile | null
   loading: boolean
 }
+
 const AuthContext = createContext<AuthContextType>(null!)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true); // Começa como true
+  const [loading, setLoading] = useState(true); 
 
   useEffect(() => {
-    console.log('AuthProvider (v5 - Deadlock Fix): Configurando listener...')
-
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      
-      (event, session) => {
-        console.log(`AuthProvider: Evento: ${event}`)
-        
+      (_event, session) => {
         setSession(session)
-        setUser(session?.user ?? null)
-        setProfile(null); 
+        
+        // Só limpa o perfil se não tiver sessão (Logout)
+        if (!session) {
+          setUser(null);
+          setProfile(null);
+        } else {
+          setUser(session.user);
+        }
 
         setTimeout(async () => {
           try {
             if (session?.user) {
-              console.log(`AuthProvider: Buscando perfil (ID: ${session.user.id})`)
-
               const { data: profileData, error } = await supabase
                 .from('profiles')
-                .select('id, notion_name, user_role, project_name, assessoria')
+                .select('id, notion_name, user_role, project_name, assessoria, email')
                 .eq('id', session.user.id)
                 .limit(1)
                 .maybeSingle(); 
 
-              if (error) {
-                console.error('ERRO AO BUSCAR PERFIL:', error.message)
-              }
+              if (error) console.error('ERRO AO BUSCAR PERFIL:', error.message)
               
               setProfile(profileData as Profile ?? null)
-              console.log('AuthProvider: Perfil recebido:', profileData)
-
-            } else {
-              console.log('AuthProvider: Perfil limpo (sem sessão).')
             }
-
           } catch (error) {
               console.error('AuthProvider: Erro inesperado:', error)
           } finally {
               setLoading(false)
-              console.log('AuthProvider: Carregamento finalizado.')
           }
         }, 0) 
       }
     )
 
     return () => {
-      console.log('AuthProvider: Limpando listener.')
       authListener.subscription.unsubscribe()
     }
   }, [])

@@ -7,7 +7,7 @@ import Header from "../components/Header";
 import Project from "../components/Project/Project";
 import StatusEvaluation from "../components/StatusEvaluation";
 import { useNavigate } from "react-router-dom";
-import { FaChartLine } from "react-icons/fa";
+import { FaChartLine, FaCheckCircle, FaExclamationTriangle, FaClipboardCheck, FaUserTie, FaUsers } from "react-icons/fa";
 import ReviewModal from "../components/ReviewModal";
 import SelfEvaluationModal from "../components/SelfEvaluationModal";
 import type { SelfEvaluationFormData } from "../components/SelfEvaluationModal";
@@ -16,11 +16,9 @@ import { getEvaluationStatus } from "../utils/evaluationStatus";
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 type ViewMode = 'team' | 'director';
 
-// Retorna a segunda-feira da semana ISO atual (formato YYYY-MM-DD), mesma base do week_of das avaliações.
-// Ajuste aqui caso queira aplicar o ciclo quinzenal dos Membros.
 function getCycleDate(): string {
   const now = new Date();
-  const day = (now.getDay() + 6) % 7; // 0 = segunda, ... 6 = domingo
+  const day = (now.getDay() + 6) % 7;
   const monday = new Date(now);
   monday.setDate(now.getDate() - day);
   return monday.toISOString().split("T")[0];
@@ -30,7 +28,6 @@ export default function Dashboard() {
   const { profile, user } = useAuth();
   const navigate = useNavigate();
   
-  // Estados para as listas
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [sectorDirectors, setSectorDirectors] = useState<string[]>([]); 
   const [gestorDirectors, setGestorDirectors] = useState<string[]>([]);
@@ -47,7 +44,6 @@ export default function Dashboard() {
 
   const [selfEvalStatus, setSelfEvalStatus] = useState<'loading' | 'done' | 'pending'>('loading');
   const [isSelfEvalOpen, setIsSelfEvalOpen] = useState(false);
-  // Estado da periodicidade 
   const [evaluationStatus, setEvaluationStatus] = useState<'pending' | 'up-to-date' | null>(null);
 
   useEffect(() => {
@@ -76,7 +72,6 @@ export default function Dashboard() {
     }
   }, [pendingEvaluations, user, isPendingLoaded]);
 
-  // Novo useEffect refatorado
   useEffect(() => {
     const checkEvaluationStatus = async () => {
       if (!user || !profile) return;
@@ -95,8 +90,6 @@ export default function Dashboard() {
       }
 
       const lastEvalDateStr = data && data.length > 0 ? data[0].created_at : null;
-
-      // Usa a função helper pura e elegante!
       const status = getEvaluationStatus(profile.user_role, lastEvalDateStr);
       setEvaluationStatus(status);
     };
@@ -135,7 +128,6 @@ export default function Dashboard() {
         let notionMembersList: string[] = [];
         let discoveredProjectName: string | null = null;
 
-        // 1. BUSCA DA EQUIPE NO NOTION
         const projectFilter = profile.user_role === 'Gestor' ? (localProjectName || profile.project_name) : null;
 
         const { data: notionData, error: notionError } = await supabase.functions.invoke(
@@ -162,9 +154,6 @@ export default function Dashboard() {
             }
           }
 
-        // 2. LÓGICA DE BUSCA DE LÍDERES
-        
-        // --- CENÁRIO: MEMBRO ---
         if (profile.user_role === 'Membro') {
             const { data: directorsData } = await supabase
                 .from('profiles')
@@ -176,8 +165,6 @@ export default function Dashboard() {
                 setSectorDirectors(directorsData.map(d => d.notion_name).filter(n => n !== profile.notion_name));
             }
         } 
-        
-        // --- CENÁRIO: GESTOR ---
         else if (profile.user_role === 'Gestor') {
             setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
 
@@ -191,8 +178,6 @@ export default function Dashboard() {
                 setGestorDirectors(directorData.map(d => d.notion_name).filter(name => name !== profile.notion_name));
             }
         }
-        
-        // --- CENÁRIO: DIRETOR ---
         else if (profile.user_role === 'Diretor') {
              setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
         }
@@ -224,25 +209,6 @@ export default function Dashboard() {
             setLocalProjectName(newName);
             alert("Projeto atualizado! Lembre-se que a tag no Notion deve ser igual.");
         }
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    const confirm1 = window.confirm("TEM CERTEZA que deseja excluir sua conta?");
-    if (!confirm1) return;
-    const confirm2 = window.confirm("Essa ação é IRREVERSÍVEL. Deseja continuar?");
-    if (!confirm2) return;
-
-    try {
-      const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
-      if (error) throw error;
-      alert("Sua conta foi excluída com sucesso.");
-      await supabase.auth.signOut();
-      navigate('/login');
-    } catch (err: unknown) {
-      console.error("Erro:", err);
-      const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
-      alert("Erro ao excluir conta: " + errorMessage);
     }
   };
 
@@ -321,8 +287,6 @@ export default function Dashboard() {
     } else {
       alert(`Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`);
       setPendingEvaluations(new Map());
-      
-      // Atualiza imediatamente o banner visual para em dia
       setEvaluationStatus('up-to-date');
 
       if (user) {
@@ -341,7 +305,6 @@ export default function Dashboard() {
     );
   }
 
-  // Cálculo total para o StatusEvaluation
   let totalMembersCount = 0;
   if (profile.user_role === 'Membro') {
       totalMembersCount = sectorDirectors.length;
@@ -392,60 +355,91 @@ export default function Dashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-azulEscuroPage text-gray-200 relative pb-24">
-      <div className="p-8 pt-2 mx-auto">
+    <div className="min-h-screen bg-azulEscuroPage text-gray-200 relative overflow-x-hidden">
+      {/* Glow decorativo de fundo */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-azulClaroCheck/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-laranja/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-2">
         <Header 
             nome={profile.notion_name} 
             logout={handleLogout} 
-            deleteAccount={handleDeleteAccount} 
         />
-        
-        {/* --- AUTOAVALIAÇÃO (botão/badge do ciclo atual) --- */}
-        <div className="flex justify-center mt-6">
+      </div>
+
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-32 flex flex-col gap-10">
+
+        {/* --- HERO SECTION --- */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          <div className="flex flex-col justify-center gap-3">
+            <span className="text-xs font-semibold uppercase tracking-widest text-azulClaroCheck">Painel de Feedback</span>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Visão Geral</h1>
+            <p className="text-gray-400 max-w-md">
+              Acompanhe seus ciclos de avaliação, dê feedback à sua equipe e mantenha o time alinhado com excelência.
+            </p>
+          </div>
+
+          {/* --- AUTOAVALIAÇÃO (botão/badge do ciclo atual) --- */}
           {selfEvalStatus === 'done' ? (
-            <div className="flex items-center gap-2 px-6 py-3 bg-azulEscuroCard border border-green-500/40 rounded-lg text-green-400 font-medium">
-              <span className="w-2 h-2 rounded-full bg-green-400"></span>
-              Autoavaliação concluída
+            <div className="flex items-center gap-4 px-6 py-5 bg-green-500/10 border border-green-500/30 rounded-2xl text-green-400 font-medium shadow-lg">
+              <span className="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.6)] shrink-0"></span>
+              <div>
+                <p className="text-white font-semibold">Autoavaliação concluída</p>
+                <p className="text-sm text-green-400/80">Você já registrou sua reflexão deste ciclo.</p>
+              </div>
             </div>
           ) : (
             <button
               onClick={() => setIsSelfEvalOpen(true)}
-              className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
+              className="cursor-pointer flex items-center justify-between gap-4 px-6 py-5 bg-linear-to-br from-azulEscuroCard to-[#001A33] border border-laranja/40 rounded-2xl text-white font-medium hover:border-laranja transition-all shadow-[0_0_20px_rgba(255,102,0,0.2)] hover:shadow-[0_0_30px_rgba(255,102,0,0.35)] group"
             >
-              Realizar Autoavaliação
+              <div className="text-left">
+                <p className="text-lg font-bold">Realizar Autoavaliação</p>
+                <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">Reserve um instante para refletir sobre seu ciclo.</p>
+              </div>
+              <FaClipboardCheck className="text-3xl text-laranja shrink-0" />
             </button>
           )}
-        </div>
+        </section>
 
-        {/* BANNER DE AVISO DE PERIODICIDADE */}
         {evaluationStatus && (
-            <div className={`mt-4 px-4 py-3 rounded-lg flex items-center justify-center font-medium border shadow-sm transition-all ${
+            <div className={`animate-fade-in backdrop-blur-md bg-white/5 px-5 py-4 rounded-2xl flex items-center gap-3 font-medium border shadow-lg transition-all ${
                 evaluationStatus === 'up-to-date' 
-                ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                : 'bg-laranja/10 text-laranja border-laranja/20'
+                ? 'border-green-500/30 text-green-400' 
+                : 'border-laranja/40 text-laranja'
             }`}>
-                {evaluationStatus === 'up-to-date' 
-                    ? "✅ Avaliação em dia" 
-                    : (profile.user_role === 'Diretor' 
-                        ? "⚠️ Avaliação pendente na semana" 
-                        : "⚠️ Avaliação quinzenal pendente"
-                    )
-                }
+                {evaluationStatus === 'up-to-date' ? (
+                    <FaCheckCircle className="text-xl shrink-0" />
+                ) : (
+                    <FaExclamationTriangle className="text-xl shrink-0" />
+                )}
+                <span>
+                    {evaluationStatus === 'up-to-date' 
+                        ? "Avaliação em dia" 
+                        : (profile.user_role === 'Diretor' 
+                            ? "Avaliação pendente na semana" 
+                            : "Avaliação quinzenal pendente"
+                        )
+                    }
+                </span>
             </div>
         )}
         
         {loadingMembers ? (
-            <div className="mt-10 text-center text-gray-400 animate-pulse">
-                Buscando dados...
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
+                <div className="w-10 h-10 border-2 border-azulClaroCheck border-t-transparent rounded-full animate-spin"></div>
+                <p className="animate-pulse">Buscando dados...</p>
             </div>
         ) : (
-            <>
+            <div className="flex flex-col gap-10">
                 {/* --- BOTÃO DE ANALYTICS PARA RH --- */}
                 {profile.assessoria === 'Recursos Humanos' && (
-                    <div className="flex justify-center mt-6">
+                    <div className="flex justify-center">
                         <button
                             onClick={() => navigate('/analytics')}
-                            className="flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
+                            className="flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder/50 rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
                         >
                             <FaChartLine className="text-laranja group-hover:text-azulEscuroPage transition-colors" />
                             Acessar Painel de Analytics
@@ -453,54 +447,58 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* --- RENDERIZAÇÃO PARA MEMBRO --- */}
                 {profile.user_role === 'Membro' ? (
-                    <div className="flex flex-col gap-8 mt-6">
+                    <div className="flex flex-col gap-8">
                         {/* Linha: Diretor da Assessoria */}
                         {sectorDirectors.length > 0 ? (
-                            <Project
-                                nome={`Diretor (${profile.assessoria})`}
-                                membros={sectorDirectors}
-                                evaluate={setEvaluatingMember}
-                                submit={handleSubmitAll}
-                                loading={isSubmitting}
-                                onReview={() => setIsReviewOpen(true)}
-                            />
+                            <div className="bg-azulEscuroCard p-6 sm:p-8 rounded-3xl border border-[#001A33] shadow-xl">
+                                <Project
+                                    nome={`Diretor (${profile.assessoria})`}
+                                    membros={sectorDirectors}
+                                    evaluate={setEvaluatingMember}
+                                    submit={handleSubmitAll}
+                                    loading={isSubmitting}
+                                    onReview={() => setIsReviewOpen(true)}
+                                />
+                            </div>
                         ) : (
-                            <div className="text-center text-gray-500 mt-4 text-sm border border-dashed border-gray-700 rounded p-4">
-                                <p>Nenhum diretor encontrado para a assessoria: <strong>{profile.assessoria}</strong></p>
+                            <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 border-2 border-dashed border-[#001A33] rounded-3xl bg-azulEscuroCard/40 text-center">
+                                <FaUserTie className="text-4xl text-gray-600" />
+                                <p className="text-gray-400">Nenhum diretor encontrado para a assessoria: <strong className="text-gray-300">{profile.assessoria}</strong></p>
                             </div>
                         )}
                     </div>
                 ) : (
-                    // --- RENDERIZAÇÃO PARA GESTOR E DIRETOR ---
-                    <>
+                    <div className="flex flex-col gap-6">
+                        {/* --- RENDERIZAÇÃO PARA GESTOR E DIRETOR --- */}
                         {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
-                            <div className="flex justify-center gap-4 my-6">
-                                <button
-                                    onClick={() => setViewMode('team')}
-                                    className={`px-6 py-2 rounded-full font-medium transition-all ${
-                                        viewMode === 'team' 
-                                        ? 'bg-laranja text-white shadow-lg scale-105' 
-                                        : 'bg-azulEscuroCard text-gray-400 border border-azulClaroBorder hover:bg-opacity-80'
-                                    }`}
-                                >
-                                    Avaliar Equipe
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('director')}
-                                    className={`px-6 py-2 rounded-full font-medium transition-all ${
-                                        viewMode === 'director' 
-                                        ? 'bg-laranja text-white shadow-lg scale-105' 
-                                        : 'bg-azulEscuroCard text-gray-400 border border-azulClaroBorder hover:bg-opacity-80'
-                                    }`}
-                                >
-                                    Avaliar Diretor
-                                </button>
+                            <div className="flex justify-center">
+                                <div className="bg-azulEscuroPage p-1.5 rounded-xl inline-flex border border-[#001A33] gap-1">
+                                    <button
+                                        onClick={() => setViewMode('team')}
+                                        className={`cursor-pointer px-6 py-2 rounded-lg font-medium transition-all ${
+                                            viewMode === 'team' 
+                                            ? 'bg-laranja text-white shadow-lg' 
+                                            : 'text-gray-500 hover:text-white'
+                                        }`}
+                                    >
+                                        Avaliar Equipe
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('director')}
+                                        className={`cursor-pointer px-6 py-2 rounded-lg font-medium transition-all ${
+                                            viewMode === 'director' 
+                                            ? 'bg-laranja text-white shadow-lg' 
+                                            : 'text-gray-500 hover:text-white'
+                                        }`}
+                                    >
+                                        Avaliar Diretor
+                                    </button>
+                                </div>
                             </div>
                         )}
 
-                        <div className="mt-6">
+                        <div className="bg-azulEscuroCard p-6 sm:p-8 rounded-3xl border border-[#001A33] shadow-xl">
                             <Project
                                 nome={
                                     profile.user_role === 'Diretor' ? profile.assessoria :
@@ -520,19 +518,25 @@ export default function Dashboard() {
                         </div>
                         
                         {teamMembers.length === 0 && (profile.user_role !== 'Gestor' || viewMode === 'team') && (
-                            <p className="text-center text-gray-500 mt-4">Ninguém encontrado nesta categoria.</p>
+                            <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 border-2 border-dashed border-[#001A33] rounded-3xl bg-azulEscuroCard/40 text-center">
+                                <FaUsers className="text-4xl text-gray-600" />
+                                <p className="text-gray-400">Ninguém encontrado nesta categoria.</p>
+                            </div>
                         )}
-                    </>
+                    </div>
                 )}
-            </>
+            </div>
         )}
-      </div>
 
-      <StatusEvaluation
-        totalMembers={totalMembersCount}
-        evaluated={Array.from(pendingEvaluations.keys()).length}
-        pending={totalMembersCount - Array.from(pendingEvaluations.keys()).length}
-      />
+        {/* --- RODAPÉ DE STATUS --- */}
+        <div className="flex justify-center pt-4">
+          <StatusEvaluation
+            totalMembers={totalMembersCount}
+            evaluated={Array.from(pendingEvaluations.keys()).length}
+            pending={totalMembersCount - Array.from(pendingEvaluations.keys()).length}
+          />
+        </div>
+      </main>
 
       {evaluatingMember && (
         <EvaluationModal

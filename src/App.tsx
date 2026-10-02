@@ -3,6 +3,7 @@ import Login from './pages/Login'
 import SignUp from './pages/SignUp'
 import Dashboard from './pages/Dashboard'
 import Analytics from './pages/Analytics'
+import AdminDashboard from './pages/AdminDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -10,9 +11,9 @@ function App() {
     <Routes>
       {/* Rotas Públicas */}
       <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<SignUp />} /> {/* <-- Adicione esta rota */}
+      <Route path="/signup" element={<SignUp />} />
 
-      {/* Rota Protegida */}
+      {/* Rota Protegida do Membro Comum */}
       <Route
         path="/"
         element={
@@ -31,6 +32,15 @@ function App() {
         }
       />
       
+      {/* Rota Protegida Exclusiva do RH */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute requireAdmin={true}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   )
 }

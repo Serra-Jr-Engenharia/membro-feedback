@@ -55,9 +55,7 @@ export default function Analytics() {
     navigate('/login');
   };
 
-  const handleDeleteAccount = async () => {
-    alert("Para excluir a conta, acesse o Dashboard.");
-  };
+
 
   const filteredData = data.filter(item => {
     const matchesSearch = item.member_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -75,7 +73,6 @@ export default function Analytics() {
         <Header 
             nome={profile.notion_name} 
             logout={handleLogout} 
-            deleteAccount={handleDeleteAccount}
         />
 
         <div className="mt-8 mb-8">
