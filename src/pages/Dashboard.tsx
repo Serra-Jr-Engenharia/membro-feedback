@@ -11,7 +11,7 @@ import { FaChartLine, FaCheckCircle, FaExclamationTriangle, FaClipboardCheck, Fa
 import ReviewModal from "../components/ReviewModal";
 import SelfEvaluationModal from "../components/SelfEvaluationModal";
 import type { SelfEvaluationFormData } from "../components/SelfEvaluationModal";
-import { getEvaluationStatus } from "../utils/evaluationStatus";
+import { getEvaluationStatus, getCycleStartDate } from "../utils/evaluationStatus";
 
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 type ViewMode = 'team' | 'director';
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [evaluatingMember, setEvaluatingMember] = useState<string | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluationsMap>(new Map());
+  const [evaluatedInDb, setEvaluatedInDb] = useState<Set<string>>(new Set());
   const [isPendingLoaded, setIsPendingLoaded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -50,7 +51,7 @@ export default function Dashboard() {
     if (profile?.project_name) {
         setLocalProjectName(profile.project_name);
     }
-  }, [profile]);
+  }, [profile?.project_name]);
 
   useEffect(() => {
     if (user && !isPendingLoaded) {
@@ -75,23 +76,31 @@ export default function Dashboard() {
   useEffect(() => {
     const checkEvaluationStatus = async () => {
       if (!user || !profile) return;
-      if (profile.user_role !== 'Membro' && profile.user_role !== 'Diretor') return;
+
+      const cycleStart = getCycleStartDate(profile.user_role);
 
       const { data, error } = await supabase
         .from('evaluations')
-        .select('created_at')
+        .select('member_name, created_at')
         .eq('director_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
+        .gte('created_at', cycleStart.toISOString())
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error("Erro ao buscar datas de avaliação:", error);
         return;
       }
 
-      const lastEvalDateStr = data && data.length > 0 ? data[0].created_at : null;
-      const status = getEvaluationStatus(profile.user_role, lastEvalDateStr);
-      setEvaluationStatus(status);
+      if (data) {
+        const evaluatedNames = new Set(data.map((e) => e.member_name));
+        setEvaluatedInDb(evaluatedNames);
+      }
+
+      if (profile.user_role === 'Membro' || profile.user_role === 'Diretor') {
+        const lastEvalDateStr = data && data.length > 0 ? data[0].created_at : null;
+        const status = getEvaluationStatus(profile.user_role, lastEvalDateStr);
+        setEvaluationStatus(status);
+      }
     };
 
     checkEvaluationStatus();
@@ -148,7 +157,7 @@ export default function Dashboard() {
           } else {
             notionMembersList = [...(notionData.members || [])];
             
-            if (notionData.detected_project) {
+            if (notionData.detected_project && notionData.detected_project !== localProjectName) {
                 discoveredProjectName = notionData.detected_project;
                 setLocalProjectName(discoveredProjectName || ""); 
             }
@@ -286,6 +295,13 @@ export default function Dashboard() {
       console.error(error);
     } else {
       alert(`Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`);
+      setEvaluatedInDb((prev) => {
+        const next = new Set(prev);
+        for (const [memberName] of pendingEvaluations) {
+          next.add(memberName);
+        }
+        return next;
+      });
       setPendingEvaluations(new Map());
       setEvaluationStatus('up-to-date');
 
@@ -305,14 +321,25 @@ export default function Dashboard() {
     );
   }
 
-  let totalMembersCount = 0;
-  if (profile.user_role === 'Membro') {
-      totalMembersCount = sectorDirectors.length;
-  } else if (profile.user_role === 'Gestor') {
-      totalMembersCount = (viewMode === 'team' ? teamMembers.length : gestorDirectors.length);
-  } else {
-      totalMembersCount = teamMembers.length;
-  }
+  const currentMembersList = profile.user_role === 'Membro'
+    ? sectorDirectors
+    : (profile.user_role === 'Gestor'
+        ? (viewMode === 'team' ? teamMembers : gestorDirectors)
+        : teamMembers);
+
+  const totalMembersCount = currentMembersList.length;
+
+  const evaluatedCount = currentMembersList.filter(
+    (name) => evaluatedInDb.has(name) || pendingEvaluations.has(name)
+  ).length;
+
+  const pendingCount = Math.max(0, totalMembersCount - evaluatedCount);
+
+  const getMemberStatus = (name: string): 'evaluated' | 'draft' | 'pending' => {
+    if (pendingEvaluations.has(name)) return 'draft';
+    if (evaluatedInDb.has(name)) return 'evaluated';
+    return 'pending';
+  };
 
   const reviewTargets: { nome: string; evaluationType: 'member' | 'director' }[] = (() => {
     if (!profile) return [];
@@ -459,6 +486,7 @@ export default function Dashboard() {
                                     submit={handleSubmitAll}
                                     loading={isSubmitting}
                                     onReview={() => setIsReviewOpen(true)}
+                                    getMemberStatus={getMemberStatus}
                                 />
                             </div>
                         ) : (
@@ -514,6 +542,7 @@ export default function Dashboard() {
                                 loading={isSubmitting}
                                 onEditTitle={(profile.user_role === 'Gestor' && viewMode === 'team') ? handleEditProjectName : undefined}
                                 onReview={() => setIsReviewOpen(true)}
+                                getMemberStatus={getMemberStatus}
                             />
                         </div>
                         
@@ -532,8 +561,8 @@ export default function Dashboard() {
         <div className="flex justify-center pt-4">
           <StatusEvaluation
             totalMembers={totalMembersCount}
-            evaluated={Array.from(pendingEvaluations.keys()).length}
-            pending={totalMembersCount - Array.from(pendingEvaluations.keys()).length}
+            evaluated={evaluatedCount}
+            pending={pendingCount}
           />
         </div>
       </main>
