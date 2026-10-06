@@ -21,3 +21,15 @@ export function getEvaluationStatus(
   const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / 86_400_000); // 86.400.000 ms = 1 dia
   return diffDays < 15 ? 'up-to-date' : 'pending';
 }
+
+export function getCycleStartDate(role: 'Membro' | 'Diretor' | string): Date {
+  const now = new Date();
+  if (role === 'Diretor' || role === 'Gestor') {
+    const monday = new Date(now);
+    const day = monday.getDay();
+    monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1));
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  }
+  return new Date(now.getTime() - 15 * 86_400_000);
+}
