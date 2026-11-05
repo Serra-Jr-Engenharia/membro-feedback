@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       if (body?.targetUserId) {
         targetUserId = body.targetUserId
       }
-    } catch (_) {
+    } catch {
       // Se o body estiver vazio, segue o fluxo mantendo o targetUserId como o do próprio usuário
     }
 

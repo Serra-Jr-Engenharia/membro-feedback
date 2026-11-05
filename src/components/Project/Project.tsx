@@ -10,6 +10,7 @@ interface ProjectProps {
   loading?: boolean;
   onEditTitle?: () => void;
   onReview?: () => void;
+  getMemberStatus?: (memberName: string) => 'evaluated' | 'draft' | 'pending';
 }
 
 export default function Project({
@@ -20,6 +21,7 @@ export default function Project({
   loading = false,
   onEditTitle,
   onReview,
+  getMemberStatus,
 }: ProjectProps) {
   
   return (
@@ -54,7 +56,11 @@ export default function Project({
           {membros.map((membroNome, idx) => (
             <div key={idx} className="w-full flex justify-center sm:justify-start">
               {/* O componente Card precisará ter largura 100% no arquivo dele para preencher o grid */}
-              <Card nome={membroNome} evaluate={() => evaluate(membroNome)} />
+              <Card
+                nome={membroNome}
+                evaluate={() => evaluate(membroNome)}
+                status={getMemberStatus ? getMemberStatus(membroNome) : 'pending'}
+              />
             </div>
           ))}
         </div>
