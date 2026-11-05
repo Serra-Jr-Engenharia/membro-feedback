@@ -44,6 +44,7 @@ export default function Dashboard() {
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   const [selfEvalStatus, setSelfEvalStatus] = useState<'loading' | 'done' | 'pending'>('loading');
+  const [pendingSelfEvaluation, setPendingSelfEvaluation] = useState<SelfEvaluationFormData | null>(null);
   const [isSelfEvalOpen, setIsSelfEvalOpen] = useState(false);
   const [evaluationStatus, setEvaluationStatus] = useState<'pending' | 'up-to-date' | null>(null);
 
@@ -63,6 +64,14 @@ export default function Dashboard() {
           console.error("Erro ao carregar avaliações pendentes", e);
         }
       }
+      const savedSelf = localStorage.getItem(`pendingSelfEval_${user.id}`);
+      if (savedSelf) {
+        try {
+          setPendingSelfEvaluation(JSON.parse(savedSelf));
+        } catch (e) {
+          console.error("Erro ao carregar autoavaliação pendente", e);
+        }
+      }
       setIsPendingLoaded(true);
     }
   }, [user, isPendingLoaded]);
@@ -72,6 +81,16 @@ export default function Dashboard() {
       localStorage.setItem(`pendingEvals_${user.id}`, JSON.stringify(Array.from(pendingEvaluations.entries())));
     }
   }, [pendingEvaluations, user, isPendingLoaded]);
+
+  useEffect(() => {
+    if (user && isPendingLoaded) {
+      if (pendingSelfEvaluation) {
+        localStorage.setItem(`pendingSelfEval_${user.id}`, JSON.stringify(pendingSelfEvaluation));
+      } else {
+        localStorage.removeItem(`pendingSelfEval_${user.id}`);
+      }
+    }
+  }, [pendingSelfEvaluation, user, isPendingLoaded]);
 
   useEffect(() => {
     const checkEvaluationStatus = async () => {
@@ -119,7 +138,13 @@ export default function Dashboard() {
         .maybeSingle();
 
       if (!cancelled) {
-        setSelfEvalStatus(data ? "done" : "pending");
+        if (data) {
+          setSelfEvalStatus("done");
+          setPendingSelfEvaluation(null);
+          localStorage.removeItem(`pendingSelfEval_${user.id}`);
+        } else {
+          setSelfEvalStatus("pending");
+        }
       }
     };
 
@@ -229,22 +254,9 @@ export default function Dashboard() {
     setEvaluatingMember(null);
   };
 
-  const handleSubmitSelfEvaluation = async (formData: SelfEvaluationFormData) => {
-    if (!user) throw new Error("Usuário não autenticado.");
-
-    const { error } = await supabase
-      .from("self_evaluations")
-      .upsert(
-        {
-          user_id: user.id,
-          week_of: getCycleDate(),
-          ...formData,
-        },
-        { onConflict: "user_id,week_of" }
-      );
-
-    if (error) throw error;
-    setSelfEvalStatus("done");
+  const handleSaveSelfEvaluation = (formData: SelfEvaluationFormData) => {
+    setPendingSelfEvaluation(formData);
+    setIsSelfEvalOpen(false);
   };
 
   const handleSubmitAll = async () => {
@@ -253,7 +265,7 @@ export default function Dashboard() {
       return;
     }
 
-    if (selfEvalStatus !== 'done') {
+    if (selfEvalStatus !== 'done' && !pendingSelfEvaluation) {
       alert("Você precisa concluir sua autoavaliação antes de enviar as avaliações.");
       return;
     }
@@ -263,10 +275,33 @@ export default function Dashboard() {
       return;
     }
 
-    const confirm = window.confirm(`Deseja enviar ${pendingEvaluations.size} avaliações?`);
+    const confirmMessage = pendingSelfEvaluation
+      ? `Deseja enviar ${pendingEvaluations.size} avaliação(ões) e sua autoavaliação?`
+      : `Deseja enviar ${pendingEvaluations.size} avaliações?`;
+    const confirm = window.confirm(confirmMessage);
     if (!confirm) return;
 
     setIsSubmitting(true);
+
+    if (pendingSelfEvaluation) {
+      const { error: selfEvalError } = await supabase
+        .from("self_evaluations")
+        .upsert(
+          {
+            user_id: user.id,
+            week_of: getCycleDate(),
+            ...pendingSelfEvaluation,
+          },
+          { onConflict: "user_id,week_of" }
+        );
+
+      if (selfEvalError) {
+        alert("Erro ao enviar autoavaliação: " + selfEvalError.message);
+        console.error(selfEvalError);
+        setIsSubmitting(false);
+        return;
+      }
+    }
 
     const evaluationsToInsert = Array.from(pendingEvaluations.entries()).map(
       ([memberName, formData]) => {
@@ -294,7 +329,17 @@ export default function Dashboard() {
       alert("Erro ao enviar avaliações: " + error.message);
       console.error(error);
     } else {
-      alert(`Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`);
+      if (pendingSelfEvaluation) {
+        setSelfEvalStatus("done");
+        setPendingSelfEvaluation(null);
+        localStorage.removeItem(`pendingSelfEval_${user.id}`);
+      }
+
+      alert(
+        pendingSelfEvaluation
+          ? `Sucesso! ${evaluationsToInsert.length} avaliação(ões) e sua autoavaliação foram enviadas.`
+          : `Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`
+      );
       setEvaluatedInDb((prev) => {
         const next = new Set(prev);
         for (const [memberName] of pendingEvaluations) {
@@ -417,6 +462,24 @@ export default function Dashboard() {
                 <p className="text-sm text-green-400/80">Você já registrou sua reflexão deste ciclo.</p>
               </div>
             </div>
+          ) : pendingSelfEvaluation ? (
+            <button
+              onClick={() => setIsSelfEvalOpen(true)}
+              className="cursor-pointer flex items-center justify-between gap-4 px-6 py-5 bg-laranja/10 border border-laranja/60 rounded-2xl text-white font-medium hover:border-laranja transition-all shadow-lg group"
+            >
+              <div className="text-left">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-lg font-bold text-white">Autoavaliação preenchida</p>
+                  <span className="text-[11px] font-semibold text-laranja bg-laranja/15 border border-laranja/40 px-2 py-0.5 rounded-full">
+                    Rascunho salvo
+                  </span>
+                </div>
+                <p className="text-sm text-gray-300 group-hover:text-white transition-colors">
+                  Será enviada junto com a avaliação geral. Clique para editar.
+                </p>
+              </div>
+              <FaClipboardCheck className="text-3xl text-laranja shrink-0" />
+            </button>
           ) : (
             <button
               onClick={() => setIsSelfEvalOpen(true)}
@@ -591,8 +654,9 @@ export default function Dashboard() {
       {isSelfEvalOpen && (
         <SelfEvaluationModal
           userName={profile.notion_name}
+          initialData={pendingSelfEvaluation ?? undefined}
           onClose={() => setIsSelfEvalOpen(false)}
-          onSubmit={handleSubmitSelfEvaluation}
+          onSubmit={handleSaveSelfEvaluation}
         />
       )}
 

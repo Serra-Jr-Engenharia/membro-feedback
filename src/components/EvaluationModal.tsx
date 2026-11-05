@@ -96,6 +96,11 @@ export default function EvaluationModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+      return;
+    }
     
     const formData: EvaluationFormData = {
       rating_comunicacao: comunicacao,
@@ -152,16 +157,18 @@ export default function EvaluationModal({
                     style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
                 ></div>
                 {[1, 2, 3].map((step) => (
-                    <div 
-                        key={step} 
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 shadow-lg ${
+                    <button
+                        key={step}
+                        type="button"
+                        onClick={() => setCurrentStep(step)}
+                        className={`cursor-pointer w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 shadow-lg ${
                             currentStep >= step 
                             ? 'bg-azulClaroCheck text-azulEscuroPage shadow-cyan-500/40 ring-4 ring-azulEscuroCard' 
                             : 'bg-[#001A33] text-gray-500 ring-4 ring-azulEscuroCard'
                         }`}
                     >
                         {step}
-                    </div>
+                    </button>
                 ))}
             </div>
         </header>
@@ -252,7 +259,7 @@ export default function EvaluationModal({
                 </div>
 
                 {/* STEP 3: Conclusão */}
-                <div className={`transition-all duration-300 h-full flex flex-col ${currentStep === 3 ? 'block animate-fade-in' : 'hidden'}`}>
+                <div className={`transition-all duration-300 h-full flex-col ${currentStep === 3 ? 'flex animate-fade-in' : 'hidden'}`}>
                     <h3 className="text-lg font-semibold text-white mb-4 border-l-4 border-green-500 pl-3">Parecer Final</h3>
                     <div className="flex-1 flex flex-col">
                         <label className="text-gray-300 text-sm font-medium mb-2">Comentários e Feedbacks Adicionais</label>
@@ -280,6 +287,7 @@ export default function EvaluationModal({
 
             {currentStep < totalSteps ? (
                 <button
+                    key="next-step-btn"
                     type="button"
                     onClick={handleNextStep}
                     className="cursor-pointer px-6 py-2.5 bg-[#001A33] text-azulClaroCheck border border-azulClaroBorder/50 hover:bg-azulClaroCheck hover:text-azulEscuroPage rounded-lg transition-all font-semibold shadow-lg"
@@ -288,6 +296,7 @@ export default function EvaluationModal({
                 </button>
             ) : (
                 <button
+                    key="submit-eval-btn"
                     type="submit"
                     form="evaluationForm"
                     className="cursor-pointer px-8 py-2.5 bg-laranja text-white rounded-lg hover:bg-orange-500 transition-all font-bold shadow-[0_0_15px_rgba(255,102,0,0.3)] hover:shadow-[0_0_20px_rgba(255,102,0,0.5)] transform hover:-translate-y-0.5"
