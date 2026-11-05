@@ -320,9 +320,6 @@ export default function Dashboard() {
       alert("Erro ao enviar avaliações: " + error.message);
       console.error(error);
     } else {
-<<<<<<< HEAD
-      alert(`Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`);
-=======
       if (pendingSelfEvaluation) {
         setSelfEvalStatus("done");
         setPendingSelfEvaluation(null);
@@ -341,7 +338,6 @@ export default function Dashboard() {
         }
         return next;
       });
->>>>>>> 7047d19 (fix:autoevaluation+stepserror)
       setPendingEvaluations(new Map());
       setEvaluationStatus('up-to-date');
 
