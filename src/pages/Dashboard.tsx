@@ -331,13 +331,6 @@ export default function Dashboard() {
           ? `Sucesso! ${evaluationsToInsert.length} avaliação(ões) e sua autoavaliação foram enviadas.`
           : `Sucesso! ${evaluationsToInsert.length} avaliações enviadas.`
       );
-      setEvaluatedInDb((prev) => {
-        const next = new Set(prev);
-        for (const [memberName] of pendingEvaluations) {
-          next.add(memberName);
-        }
-        return next;
-      });
       setPendingEvaluations(new Map());
       setEvaluationStatus('up-to-date');
 
