@@ -29,16 +29,28 @@ const QUESTIONS: SelfEvaluationQuestion[] = [
 type SelfEvaluationModalProps = {
   userName: string;
   onClose: () => void;
-  onSubmit: (data: SelfEvaluationFormData) => Promise<void>;
+  onSubmit: (data: SelfEvaluationFormData) => void | Promise<void>;
+  initialData?: SelfEvaluationFormData;
 };
 
 export default function SelfEvaluationModal({
   userName,
   onClose,
   onSubmit,
+  initialData,
 }: SelfEvaluationModalProps) {
-  const [formData, setFormData] = useState<Partial<SelfEvaluationFormData>>({});
-  const [comments, setComments] = useState("");
+  const [formData, setFormData] = useState<Partial<SelfEvaluationFormData>>(() =>
+    initialData
+      ? {
+          rating_rendimento: initialData.rating_rendimento,
+          rating_entregas: initialData.rating_entregas,
+          rating_consistencia: initialData.rating_consistencia,
+          rating_melhoria: initialData.rating_melhoria,
+          rating_fatores: initialData.rating_fatores,
+        }
+      : {}
+  );
+  const [comments, setComments] = useState(initialData?.comments || "");
   const [loading, setLoading] = useState(false);
   
   // Controle do Stepper
@@ -55,6 +67,11 @@ export default function SelfEvaluationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+      return;
+    }
 
     const missing = QUESTIONS.filter((q) => !formData[q.key]);
     if (missing.length > 0) {
@@ -115,16 +132,18 @@ export default function SelfEvaluationModal({
                   style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
               ></div>
               {[1, 2, 3].map((step) => (
-                  <div 
-                      key={step} 
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 shadow-lg ${
+                  <button
+                      key={step}
+                      type="button"
+                      onClick={() => setCurrentStep(step)}
+                      className={`cursor-pointer w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 shadow-lg ${
                           currentStep >= step 
                           ? 'bg-laranja text-white shadow-orange-500/40 ring-4 ring-azulEscuroCard' 
                           : 'bg-[#001A33] text-gray-500 ring-4 ring-azulEscuroCard'
                       }`}
                   >
                       {step}
-                  </div>
+                  </button>
               ))}
           </div>
         </header>
@@ -199,6 +218,7 @@ export default function SelfEvaluationModal({
 
           {currentStep < totalSteps ? (
               <button
+                  key="next-step-btn"
                   type="button"
                   onClick={handleNextStep}
                   className="cursor-pointer px-6 py-2.5 bg-[#001A33] text-azulClaroCheck border border-azulClaroBorder/50 hover:bg-azulClaroCheck hover:text-azulEscuroPage rounded-lg transition-all font-semibold shadow-lg"
@@ -207,6 +227,7 @@ export default function SelfEvaluationModal({
               </button>
           ) : (
               <button
+                  key="submit-self-eval-btn"
                   type="submit"
                   form="selfEvaluationForm"
                   disabled={loading}
