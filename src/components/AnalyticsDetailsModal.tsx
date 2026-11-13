@@ -58,13 +58,13 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-[#001429] border border-[#001A33] w-full max-w-4xl h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-azulEscuroCard border border-azulClaroBorder/20 w-full max-w-4xl h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-[#001A33] bg-[#000D1A]">
+        <div className="flex justify-between items-center p-6 border-b border-azulClaroBorder/20 bg-azulEscuroPage">
           <div>
             <h2 className="text-2xl font-bold text-white">Histórico Detalhado</h2>
-            <p className="text-[#FF6600] font-medium text-lg">{memberName}</p>
+            <p className="text-accent-500 font-medium text-lg">{memberName}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors cursor-pointer">
             <FaTimes size={24} />
@@ -84,12 +84,12 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
             </div>
           ) : (
             evaluations.map((item) => (
-              <div key={item.id} className="bg-[#000D1A] border border-[#001A33] rounded-lg p-5 hover:border-[#FF6600]/30 transition-all shadow-md">
+              <div key={item.id} className="bg-azulEscuroPage border border-azulClaroBorder/20 rounded-lg p-5 hover:border-accent-500/30 transition-all shadow-md">
                 
                 {/* Cabeçalho do Card (Quem avaliou + Data) */}
-                <div className="flex justify-between items-start mb-4 pb-3 border-b border-[#001A33]/50">
+                <div className="flex justify-between items-start mb-4 pb-3 border-b border-azulClaroBorder/20">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#001A33] flex items-center justify-center text-sm font-bold text-gray-300 border border-[#001A33]">
+                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-sm font-bold text-gray-300 border border-azulClaroBorder/20">
                       {item.profiles?.notion_name?.charAt(0) || "?"}
                     </div>
                     <div>
@@ -118,8 +118,8 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
 
                 {/* Comentário */}
                 {item.comments && (
-                  <div className="flex gap-3 mb-5 bg-[#001429] p-3 rounded-lg border border-[#001A33]/50">
-                    <FaQuoteLeft className="text-[#FF6600] text-opacity-40 min-w-[14px] mt-0.5" />
+                  <div className="flex gap-3 mb-5 bg-azulEscuroCard p-3 rounded-lg border border-azulClaroBorder/20">
+                    <FaQuoteLeft className="text-accent-500 text-opacity-40 min-w-[14px] mt-0.5" />
                     <p className="text-gray-300 text-sm italic leading-relaxed whitespace-pre-wrap">
                       {item.comments}
                     </p>
@@ -140,9 +140,9 @@ export default function AnalyticsDetailsModal({ memberName, onClose }: DetailPro
                         <ScoreChip label="Flexibilidade" val={item.rating_flexibilidade} />
                         
                         {item.text_delegacao && (
-                            <div className="flex items-center justify-between bg-[#001429] px-3 py-2 rounded border border-[#001A33]">
+                            <div className="flex items-center justify-between bg-azulEscuroCard px-3 py-2 rounded border border-azulClaroBorder/20">
                                 <span className="text-xs text-gray-500">Delega:</span>
-                                <span className="text-xs font-bold text-white bg-[#000D1A] px-2 py-0.5 rounded border border-[#001A33]">
+                                <span className="text-xs font-bold text-white bg-azulEscuroPage px-2 py-0.5 rounded border border-azulClaroBorder/20">
                                     {item.text_delegacao}
                                 </span>
                             </div>
@@ -176,7 +176,7 @@ const ScoreChip = ({ label, val }: { label: string, val?: number }) => {
   const valueColor = val >= 4 ? 'text-green-400' : val >= 3 ? 'text-yellow-400' : 'text-red-400';
 
   return (
-    <div className="flex items-center justify-between bg-[#001429] px-3 py-2 rounded border border-[#001A33]">
+    <div className="flex items-center justify-between bg-azulEscuroCard px-3 py-2 rounded border border-azulClaroBorder/20">
       <span className="text-xs text-gray-500 truncate mr-2" title={label}>{label}:</span>
       <span className={`${valueColor} font-bold text-sm flex items-center gap-1`}>
         {val} <FaStar size={10} className="text-yellow-600/50" />

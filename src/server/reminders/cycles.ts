@@ -40,9 +40,9 @@ function addDays(date: Date, days: number): Date {
 }
 
 /**
- * Retorna a janela do ciclo do papel na data local informada.
- * Diretor e Gestor usam ciclos semanais; Membro usa blocos quinzenais
- * consecutivos ancorados na segunda-feira indicada por memberAnchorDate.
+ * Retorna a janela do ciclo na data local informada.
+ * Todos os papéis usam o mesmo bloco quinzenal de 14 dias, ancorado
+ * na segunda-feira indicada por memberAnchorDate.
  */
 export function getCycleWindow(
   role: string,
@@ -57,25 +57,11 @@ export function getCycleWindow(
   if (anchor.getUTCDay() !== 1)
     throw new Error("memberAnchorDate deve ser uma segunda-feira");
 
-  if (role === "Diretor" || role === "Gestor") {
-    // A semana sempre começa na segunda-feira e termina no domingo.
-    const monday = addDays(date, -((date.getUTCDay() + 6) % 7));
-    const startsOn = formatDate(monday);
-    const endsOn = formatDate(addDays(monday, 6));
-    return {
-      type: "weekly",
-      key: startsOn,
-      startsOn,
-      endsOn,
-      reminderOn: formatDate(addDays(monday, 4)),
-    };
-  }
-
   const daysSinceAnchor = Math.floor(
     (date.getTime() - anchor.getTime()) / DAY_MS,
   );
   // O bloco quinzenal é calculado a partir de uma segunda-feira fixa,
-  // evitando que cada membro tenha um calendário diferente.
+  // garantindo o mesmo calendário para todos os papéis.
   const block = Math.floor(daysSinceAnchor / 14);
   const start = addDays(anchor, block * 14);
   const startsOn = formatDate(start);

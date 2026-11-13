@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import StarRating from "./StarRating";
-import userIcon from "../assets/userIcon.svg";
 
 export interface SelfEvaluationFormData {
   rating_rendimento: number;
@@ -9,6 +8,35 @@ export interface SelfEvaluationFormData {
   rating_melhoria: string;
   rating_fatores: string;
   comments?: string;
+}
+
+interface SelfEvaluationDraft {
+  formData: Partial<SelfEvaluationFormData>;
+  comments: string;
+}
+
+function getDraftKey(userName: string) {
+  return `draft_self_eval_${userName}`;
+}
+
+function readDraft(userName: string): SelfEvaluationDraft | null {
+  try {
+    const raw = localStorage.getItem(getDraftKey(userName));
+    return raw ? (JSON.parse(raw) as SelfEvaluationDraft) : null;
+  } catch (e) {
+    console.error("Erro ao carregar rascunho da autoavaliação", e);
+    return null;
+  }
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 }
 
 interface SelfEvaluationQuestion {
@@ -39,21 +67,33 @@ export default function SelfEvaluationModal({
   onSubmit,
   initialData,
 }: SelfEvaluationModalProps) {
+  const [restoredDraft] = useState(() => readDraft(userName));
+
   const [formData, setFormData] = useState<Partial<SelfEvaluationFormData>>(() =>
-    initialData
-      ? {
-          rating_rendimento: initialData.rating_rendimento,
-          rating_entregas: initialData.rating_entregas,
-          rating_consistencia: initialData.rating_consistencia,
-          rating_melhoria: initialData.rating_melhoria,
-          rating_fatores: initialData.rating_fatores,
-        }
-      : {}
+    restoredDraft?.formData
+      ? restoredDraft.formData
+      : initialData
+        ? {
+            rating_rendimento: initialData.rating_rendimento,
+            rating_entregas: initialData.rating_entregas,
+            rating_consistencia: initialData.rating_consistencia,
+            rating_melhoria: initialData.rating_melhoria,
+            rating_fatores: initialData.rating_fatores,
+          }
+        : {}
   );
-  const [comments, setComments] = useState(initialData?.comments || "");
+  const [comments, setComments] = useState(
+    restoredDraft?.comments ?? initialData?.comments ?? ""
+  );
   const [loading, setLoading] = useState(false);
-  
-  // Controle do Stepper
+
+  useEffect(() => {
+    localStorage.setItem(
+      getDraftKey(userName),
+      JSON.stringify({ formData, comments })
+    );
+  }, [formData, comments, userName]);
+
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
 
@@ -89,6 +129,7 @@ export default function SelfEvaluationModal({
         rating_fatores: formData.rating_fatores as string,
         comments: comments.trim() || undefined,
       });
+      localStorage.removeItem(getDraftKey(userName));
       onClose();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
@@ -99,70 +140,75 @@ export default function SelfEvaluationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md transition-opacity">
-      <div className="font-poppins bg-azulEscuroCard text-gray-200 rounded-2xl shadow-2xl w-full max-w-xl max-h-[95vh] flex flex-col border border-azulClaroBorder/30 overflow-hidden">
-        
-        {/* Cabeçalho e Indicador de Progresso */}
-        <header className="p-6 bg-azulEscuroPage border-b border-[#001A33] shrink-0 relative">
-          <button 
-              onClick={onClose} 
-              className="absolute top-4 right-4 text-gray-400 hover:text-white cursor-pointer p-2 rounded-full hover:bg-white/5 transition-colors"
-              aria-label="Fechar"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md transition-opacity">
+      <div className="flex max-h-[95vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-azulEscuroCard font-poppins text-gray-200 shadow-2xl">
+        <header className="relative shrink-0 border-b border-white/10 bg-azulEscuroPage p-6">
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 cursor-pointer rounded-full p-2 text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+            aria-label="Fechar"
           >
-              ✕
+            ✕
           </button>
-          <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 rounded-full bg-[#001A33] border border-azulClaroBorder/30 flex items-center justify-center p-2 shadow-[0_0_15px_rgba(13,180,224,0.1)]">
-                  <img src={userIcon} alt="Ícone" className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-white tracking-tight">{userName}</h2>
-                <span className="text-xs text-azulClaroCheck uppercase tracking-widest font-semibold flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-azulClaroCheck"></span>
-                    Autoavaliação
-                </span>
-              </div>
+          <div className="mb-4 flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-brand-800 text-sm font-semibold text-cyan-400">
+              {getInitials(userName)}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-white">
+                {userName}
+              </h2>
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-cyan-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                Autoavaliação
+              </span>
+              <span className="text-[10px] text-gray-500">
+                Rascunho salvo automaticamente
+              </span>
+            </div>
           </div>
 
-          {/* Stepper Progress Bar */}
-          <div className="flex justify-between items-center relative mt-6">
-              <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-[#001A33] -z-10"></div>
-              <div 
-                  className="absolute left-0 top-1/2 h-0.5 bg-laranja -z-10 transition-all duration-300 ease-in-out" 
-                  style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
-              ></div>
-              {[1, 2, 3].map((step) => (
-                  <button
-                      key={step}
-                      type="button"
-                      onClick={() => setCurrentStep(step)}
-                      className={`cursor-pointer w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 shadow-lg ${
-                          currentStep >= step 
-                          ? 'bg-laranja text-white shadow-orange-500/40 ring-4 ring-azulEscuroCard' 
-                          : 'bg-[#001A33] text-gray-500 ring-4 ring-azulEscuroCard'
-                      }`}
-                  >
-                      {step}
-                  </button>
-              ))}
+          <div className="relative mt-6 flex items-center justify-between">
+            <div className="absolute left-0 right-0 top-1/2 -z-10 h-0.5 bg-white/10"></div>
+            <div
+              className="absolute left-0 top-1/2 -z-10 h-0.5 bg-accent-500 transition-all duration-300 ease-in-out"
+              style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
+            ></div>
+            {[1, 2, 3].map((step) => (
+              <button
+                key={step}
+                type="button"
+                onClick={() => setCurrentStep(step)}
+                className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-xs font-bold shadow-lg ring-4 ring-azulEscuroPage transition-all duration-300 ${
+                  currentStep >= step
+                    ? "bg-accent-500 text-white"
+                    : "bg-white/5 text-brand-300"
+                }`}
+              >
+                {step}
+              </button>
+            ))}
           </div>
         </header>
 
-        {/* Corpo Rolável */}
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
-          <form id="selfEvaluationForm" onSubmit={handleSubmit} className="space-y-6 h-full">
-            
-            {/* STEP 1: Quantitativo (Estado e Trajetória) */}
-            <div className={`transition-all duration-300 h-full flex-col ${currentStep === 1 ? 'flex animate-fade-in' : 'hidden'}`}>
-              <h3 className="text-lg font-semibold text-white mb-4 border-l-4 border-azulClaroCheck pl-3">Avaliação Contínua</h3>
-              <div className="space-y-5 bg-azulEscuroPage/50 p-5 rounded-xl border border-white/5">
+        <div className="custom-scrollbar flex-1 overflow-y-auto p-6">
+          <form id="selfEvaluationForm" onSubmit={handleSubmit} className="h-full space-y-6">
+            <div className={`h-full flex-col transition-all duration-300 ${currentStep === 1 ? "flex animate-fade-in" : "hidden"}`}>
+              <h3 className="mb-4 border-l-4 border-cyan-400 pl-3 text-lg font-semibold text-white">
+                Avaliação Contínua
+              </h3>
+              <div className="space-y-5 rounded-xl border border-white/10 bg-white/5 p-5">
                 {QUESTIONS.filter((q) => q.type === "rating").map((q) => (
-                  <div key={q.key} className="flex flex-col gap-2 pb-4 border-b border-white/5 last:border-0 last:pb-0">
-                    <label className="text-gray-300 font-medium leading-snug">{q.label}</label>
+                  <div key={q.key} className="flex flex-col gap-2 border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                    <label className="font-medium leading-snug text-gray-300">
+                      {q.label}
+                    </label>
                     <div className="flex justify-start pt-1">
                       <StarRating
                         rating={(formData[q.key] as number) || 0}
-                        setRating={(value) => setFormData(prev => ({ ...prev, [q.key]: value }))}
+                        setRating={(value) =>
+                          setFormData((prev) => ({ ...prev, [q.key]: value }))
+                        }
                       />
                     </div>
                   </div>
@@ -170,17 +216,22 @@ export default function SelfEvaluationModal({
               </div>
             </div>
 
-            {/* STEP 2: Qualitativo (Performance) */}
-            <div className={`transition-all duration-300 h-full flex-col ${currentStep === 2 ? 'flex animate-fade-in' : 'hidden'}`}>
-              <h3 className="text-lg font-semibold text-white mb-4 border-l-4 border-laranja pl-3">Reflexão Prática</h3>
+            <div className={`h-full flex-col transition-all duration-300 ${currentStep === 2 ? "flex animate-fade-in" : "hidden"}`}>
+              <h3 className="mb-4 border-l-4 border-accent-500 pl-3 text-lg font-semibold text-white">
+                Reflexão Prática
+              </h3>
               <div className="space-y-5">
                 {QUESTIONS.filter((q) => q.type === "text").map((q) => (
                   <div key={q.key} className="flex flex-col">
-                    <label className="text-gray-200 font-medium mb-2">{q.label}</label>
+                    <label className="mb-2 font-medium text-gray-200">
+                      {q.label}
+                    </label>
                     <textarea
                       value={(formData[q.key] as string) || ""}
-                      onChange={(e) => setFormData(prev => ({ ...prev, [q.key]: e.target.value }))}
-                      className="w-full p-4 bg-azulEscuroPage/80 border border-[#001A33] text-white rounded-xl focus:border-laranja focus:ring-1 focus:ring-laranja outline-none transition-all placeholder-gray-600 resize-none"
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, [q.key]: e.target.value }))
+                      }
+                      className="w-full resize-none rounded-xl border border-white/10 bg-brand-950/60 p-4 text-white placeholder-gray-600 outline-none transition-all focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
                       rows={3}
                       placeholder="Descreva em detalhes..."
                     />
@@ -189,52 +240,53 @@ export default function SelfEvaluationModal({
               </div>
             </div>
 
-            {/* STEP 3: Comentários */}
-            <div className={`transition-all duration-300 h-full flex-col ${currentStep === 3 ? 'flex animate-fade-in' : 'hidden'}`}>
-              <h3 className="text-lg font-semibold text-white mb-4 border-l-4 border-green-500 pl-3">Espaço Aberto</h3>
-              <div className="flex-1 flex flex-col">
-                <label className="text-gray-300 font-medium mb-2">Comentários Adicionais (Opcional)</label>
+            <div className={`h-full flex-col transition-all duration-300 ${currentStep === 3 ? "flex animate-fade-in" : "hidden"}`}>
+              <h3 className="mb-4 border-l-4 border-success pl-3 text-lg font-semibold text-white">
+                Espaço Aberto
+              </h3>
+              <div className="flex h-full flex-1 flex-col">
+                <label className="mb-2 font-medium text-gray-300">
+                  Comentários Adicionais (Opcional)
+                </label>
                 <textarea
                   value={comments}
                   onChange={(e) => setComments(e.target.value)}
-                  className="w-full flex-1 min-h-37.5 p-4 bg-azulEscuroPage/80 border border-[#001A33] text-white rounded-xl focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none transition-all placeholder-gray-600 resize-none"
+                  className="min-h-37.5 w-full flex-1 resize-none rounded-xl border border-white/10 bg-brand-950/60 p-4 text-white placeholder-gray-600 outline-none transition-all focus:border-success focus:ring-1 focus:ring-success"
                   placeholder="Existe algo mais que você gostaria de compartilhar com a diretoria ou relatar sobre seu momento atual?"
                 />
               </div>
             </div>
-
           </form>
         </div>
 
-        {/* Rodapé e Navegação */}
-        <footer className="p-4 bg-azulEscuroPage border-t border-[#001A33] flex justify-between items-center shrink-0">
+        <footer className="flex shrink-0 items-center justify-between border-t border-white/10 bg-azulEscuroPage p-4">
           <button
-              type="button"
-              onClick={currentStep === 1 ? onClose : handlePrevStep}
-              className="cursor-pointer px-5 py-2.5 text-gray-400 hover:text-white font-medium transition-colors"
+            type="button"
+            onClick={currentStep === 1 ? onClose : handlePrevStep}
+            className="cursor-pointer px-5 py-2.5 font-medium text-gray-400 transition-colors hover:text-white"
           >
-              {currentStep === 1 ? 'Cancelar' : '← Voltar'}
+            {currentStep === 1 ? "Cancelar" : "← Voltar"}
           </button>
 
           {currentStep < totalSteps ? (
-              <button
-                  key="next-step-btn"
-                  type="button"
-                  onClick={handleNextStep}
-                  className="cursor-pointer px-6 py-2.5 bg-[#001A33] text-azulClaroCheck border border-azulClaroBorder/50 hover:bg-azulClaroCheck hover:text-azulEscuroPage rounded-lg transition-all font-semibold shadow-lg"
-              >
-                  Próximo Passo
-              </button>
+            <button
+              key="next-step-btn"
+              type="button"
+              onClick={handleNextStep}
+              className="cursor-pointer rounded-lg border border-white/15 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:border-cyan-400 hover:text-cyan-300"
+            >
+              Próximo Passo
+            </button>
           ) : (
-              <button
-                  key="submit-self-eval-btn"
-                  type="submit"
-                  form="selfEvaluationForm"
-                  disabled={loading}
-                  className="cursor-pointer px-8 py-2.5 bg-laranja text-white rounded-lg hover:bg-orange-500 transition-all font-bold shadow-[0_0_15px_rgba(255,102,0,0.3)] hover:shadow-[0_0_20px_rgba(255,102,0,0.5)] transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                  {loading ? 'Salvando...' : 'Finalizar'}
-              </button>
+            <button
+              key="submit-self-eval-btn"
+              type="submit"
+              form="selfEvaluationForm"
+              disabled={loading}
+              className="cursor-pointer rounded-lg bg-accent-500 px-8 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Salvando..." : "Finalizar"}
+            </button>
           )}
         </footer>
       </div>

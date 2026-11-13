@@ -18,7 +18,9 @@ Antes do deployment de produção, cadastre as variáveis abaixo apenas no ambie
 | `RESEND_API_KEY` | Chave de API usada exclusivamente para enviar os e-mails. |
 | `RESEND_FROM_EMAIL` | Remetente; o domínio correspondente deve estar verificado no Resend antes da ativação. |
 | `APP_URL` | URL pública do dashboard usada no link do e-mail. |
-| `MEMBER_CYCLE_ANCHOR_DATE` | Segunda-feira que ancora os blocos quinzenais globais de Membros, no formato `YYYY-MM-DD`. |
+| `MEMBER_CYCLE_ANCHOR_DATE` | Segunda-feira que ancora os blocos quinzenais de avaliação de todos os papéis, no formato `YYYY-MM-DD`. |
+
+O frontend usa `VITE_MEMBER_CYCLE_ANCHOR_DATE` para calcular o mesmo bloco quinzenal. Mantenha o mesmo valor de `MEMBER_CYCLE_ANCHOR_DATE`; se ausente, o fallback é `2026-08-17`.
 
 ### Operação e acompanhamento
 
