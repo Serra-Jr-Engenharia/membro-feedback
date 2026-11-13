@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { Link, useNavigate } from 'react-router-dom'
+import ThemeToggle from '../components/ThemeToggle'
 
 const assessorias = [
   'Computação', 'Mecânica', 'SerraLab', 'Comercial', 'Marketing', 'Recursos Humanos'
@@ -86,11 +87,14 @@ export default function SignUp() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-azulEscuroPage font-poppins text-gray-200">
-      <form onSubmit={handleSignUp} className="p-8 bg-azulEscuroCard border border-azulClaroBorder rounded shadow-md w-96 flex flex-col gap-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-azulEscuroPage px-4 font-poppins text-gray-200">
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
+      <form onSubmit={handleSignUp} className="flex w-full max-w-md flex-col gap-4 border border-azulClaroBorder bg-azulEscuroCard p-6 shadow-md sm:p-8">
         <h2 className="text-2xl font-bold mb-2 text-center text-white">Cadastrar</h2>
 
-        {error && <div className="p-3 text-sm text-red-800 bg-red-100 rounded">{error}</div>}
+        {error && <div className="p-3 text-sm text-red-200 bg-red-900/50 border border-red-500/50 rounded text-center">{error}</div>}
 
         {/* --- Seleção de Nome (do Notion) --- */}
         <div>
@@ -179,7 +183,7 @@ export default function SignUp() {
         <button 
             type="submit" 
             disabled={loading || loadingMembers} 
-            className="w-full p-2 mt-4 text-white font-bold bg-laranja rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full p-2 mt-4 text-white font-bold bg-laranja rounded transition-all duration-200 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] motion-reduce:transform-none motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Cadastrando...' : 'Cadastrar'}
         </button>

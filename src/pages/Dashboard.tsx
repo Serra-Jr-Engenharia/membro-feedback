@@ -1,27 +1,68 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../hooks/AuthProvider";
 import EvaluationModal from "../components/EvaluationModal";
 import type { EvaluationFormData } from "../components/EvaluationModal";
 import Header from "../components/Header";
 import Project from "../components/Project/Project";
-import StatusEvaluation from "../components/StatusEvaluation";
+import Button from "../components/Project/Button";
+import ViewSelfEvaluationModal from "../components/ViewSelfEvaluationModal";
 import { useNavigate } from "react-router-dom";
-import { FaChartLine, FaCheckCircle, FaExclamationTriangle, FaClipboardCheck, FaUserTie, FaUsers } from "react-icons/fa";
+import { FaCheckCircle, FaClipboardCheck, FaExclamationTriangle } from "react-icons/fa";
 import ReviewModal from "../components/ReviewModal";
 import SelfEvaluationModal from "../components/SelfEvaluationModal";
 import type { SelfEvaluationFormData } from "../components/SelfEvaluationModal";
-import { getEvaluationStatus, getCycleStartDate } from "../utils/evaluationStatus";
+import {
+  getCycleDateISO,
+  getCycleStartDate,
+  getEvaluationStatus,
+} from "../utils/evaluationStatus";
+import {
+  formatCycleRange,
+  type SelfEvaluationRecord,
+} from "../utils/selfEvaluation";
 
 type PendingEvaluationsMap = Map<string, EvaluationFormData>;
 type ViewMode = 'team' | 'director';
 
-function getCycleDate(): string {
-  const now = new Date();
-  const day = (now.getDay() + 6) % 7;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - day);
-  return monday.toISOString().split("T")[0];
+function isMeaningfulEvaluationDraft(draft: EvaluationFormData): boolean {
+  return Boolean(
+    draft.rating_comunicacao > 0 ||
+    draft.rating_proatividade > 0 ||
+    (draft.rating_participacao ?? 0) > 0 ||
+    (draft.rating_relacao_grupo ?? 0) > 0 ||
+    (draft.rating_entrega_metas ?? 0) > 0 ||
+    (draft.rating_lideranca ?? 0) > 0 ||
+    (draft.rating_flexibilidade ?? 0) > 0 ||
+    draft.is_destaque ||
+    (draft.comments ?? "").trim().length > 0 ||
+    (draft.text_delegacao ?? "Alguns") !== "Alguns"
+  );
+}
+
+function hasMeaningfulSelfEvaluationDraft(userName: string): boolean {
+  try {
+    const raw = localStorage.getItem(`draft_self_eval_${userName}`);
+    if (!raw) return false;
+
+    const draft = JSON.parse(raw) as {
+      formData?: Partial<SelfEvaluationFormData>;
+      comments?: string;
+    };
+    const data = draft.formData ?? {};
+
+    return Boolean(
+      data.rating_rendimento ||
+      data.rating_entregas ||
+      data.rating_consistencia ||
+      (data.rating_melhoria ?? "").trim().length > 0 ||
+      (data.rating_fatores ?? "").trim().length > 0 ||
+      (draft.comments ?? "").trim().length > 0
+    );
+  } catch (e) {
+    console.error("Erro ao verificar rascunho da autoavaliação", e);
+    return false;
+  }
 }
 
 export default function Dashboard() {
@@ -31,6 +72,7 @@ export default function Dashboard() {
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [sectorDirectors, setSectorDirectors] = useState<string[]>([]); 
   const [gestorDirectors, setGestorDirectors] = useState<string[]>([]);
+  const [leaderNames, setLeaderNames] = useState<Set<string>>(new Set());
 
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [evaluatingMember, setEvaluatingMember] = useState<string | null>(null);
@@ -46,6 +88,9 @@ export default function Dashboard() {
   const [selfEvalStatus, setSelfEvalStatus] = useState<'loading' | 'done' | 'pending'>('loading');
   const [pendingSelfEvaluation, setPendingSelfEvaluation] = useState<SelfEvaluationFormData | null>(null);
   const [isSelfEvalOpen, setIsSelfEvalOpen] = useState(false);
+  const [currentSelfEvaluation, setCurrentSelfEvaluation] = useState<SelfEvaluationRecord | null>(null);
+  const [viewedSelfEvaluation, setViewedSelfEvaluation] = useState<SelfEvaluationRecord | null>(null);
+  const [hasSelfEvalDraft, setHasSelfEvalDraft] = useState(false);
   const [evaluationStatus, setEvaluationStatus] = useState<'pending' | 'up-to-date' | null>(null);
 
   useEffect(() => {
@@ -92,11 +137,25 @@ export default function Dashboard() {
     }
   }, [pendingSelfEvaluation, user, isPendingLoaded]);
 
+  const checkSelfEvalDraft = useCallback(() => {
+    if (!profile?.notion_name) {
+      setHasSelfEvalDraft(false);
+      return;
+    }
+    setHasSelfEvalDraft(hasMeaningfulSelfEvaluationDraft(profile.notion_name));
+  }, [profile?.notion_name]);
+
+  useEffect(() => {
+    if (!isSelfEvalOpen) {
+      checkSelfEvalDraft();
+    }
+  }, [isSelfEvalOpen, checkSelfEvalDraft]);
+
   useEffect(() => {
     const checkEvaluationStatus = async () => {
       if (!user || !profile) return;
 
-      const cycleStart = getCycleStartDate(profile.user_role);
+      const cycleStart = getCycleStartDate();
 
       const { data, error } = await supabase
         .from('evaluations')
@@ -116,43 +175,45 @@ export default function Dashboard() {
       }
 
       if (profile.user_role === 'Membro' || profile.user_role === 'Diretor') {
-        const lastEvalDateStr = data && data.length > 0 ? data[0].created_at : null;
-        const status = getEvaluationStatus(profile.user_role, lastEvalDateStr);
-        setEvaluationStatus(status);
+        const lastEvalDate = data && data.length > 0 ? data[0].created_at : null;
+        setEvaluationStatus(getEvaluationStatus(lastEvalDate));
       }
     };
 
     checkEvaluationStatus();
   }, [user, profile]);
 
-  useEffect(() => {
+  const refreshSelfEvaluations = useCallback(async () => {
     if (!user) return;
-    let cancelled = false;
 
-    const checkSelfEvaluation = async () => {
-      const { data } = await supabase
-        .from("self_evaluations")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("week_of", getCycleDate())
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from("self_evaluations")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("week_of", { ascending: false })
+      .limit(5);
 
-      if (!cancelled) {
-        if (data) {
-          setSelfEvalStatus("done");
-          setPendingSelfEvaluation(null);
-          localStorage.removeItem(`pendingSelfEval_${user.id}`);
-        } else {
-          setSelfEvalStatus("pending");
-        }
-      }
-    };
+    if (error) {
+      console.error("Erro ao buscar autoavaliações:", error);
+      return;
+    }
 
-    checkSelfEvaluation();
-    return () => {
-      cancelled = true;
-    };
+    const records = (data ?? []) as SelfEvaluationRecord[];
+    const currentCycle = getCycleDateISO();
+    const current = records.find((record) => record.week_of === currentCycle) ?? null;
+
+    setCurrentSelfEvaluation(current);
+    setSelfEvalStatus(current ? "done" : "pending");
+
+    if (current) {
+      setPendingSelfEvaluation(null);
+      localStorage.removeItem(`pendingSelfEval_${user.id}`);
+    }
   }, [user]);
+
+  useEffect(() => {
+    refreshSelfEvaluations();
+  }, [refreshSelfEvaluations]);
 
   useEffect(() => {
     if (profile) {
@@ -214,6 +275,20 @@ export default function Dashboard() {
         }
         else if (profile.user_role === 'Diretor') {
              setTeamMembers(notionMembersList.filter(name => name !== profile.notion_name));
+
+             const { data: leaderData } = await supabase
+                .from('profiles')
+                .select('notion_name, user_role')
+                .eq('assessoria', profile.assessoria)
+                .in('user_role', ['Diretor', 'Gestor']);
+
+             if (leaderData) {
+                setLeaderNames(new Set(
+                    leaderData
+                        .map((leader) => leader.notion_name)
+                        .filter((name): name is string => Boolean(name))
+                ));
+             }
         }
         
         setLoadingMembers(false);
@@ -222,6 +297,52 @@ export default function Dashboard() {
       fetchTargets();
     }
   }, [profile, localProjectName]);
+
+  useEffect(() => {
+    if (!user || !profile || !isPendingLoaded) return;
+
+    const targetNames =
+      profile.user_role === 'Membro'
+        ? sectorDirectors
+        : profile.user_role === 'Gestor' && viewMode === 'director'
+          ? gestorDirectors
+          : teamMembers;
+
+    if (targetNames.length === 0) return;
+
+    setPendingEvaluations((prev) => {
+      const next = new Map(prev);
+      let changed = false;
+
+      for (const name of targetNames) {
+        if (next.has(name) || evaluatedInDb.has(name)) continue;
+
+        const raw = localStorage.getItem(`draft_eval_${name}`);
+        if (!raw) continue;
+
+        try {
+          const draft = JSON.parse(raw) as EvaluationFormData;
+          if (!isMeaningfulEvaluationDraft(draft)) continue;
+          next.set(name, draft);
+          changed = true;
+        } catch (e) {
+          console.error("Erro ao carregar rascunho de avaliação", e);
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [
+    user,
+    profile,
+    isPendingLoaded,
+    sectorDirectors,
+    gestorDirectors,
+    teamMembers,
+    viewMode,
+    evaluatedInDb,
+    evaluatingMember,
+  ]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -259,6 +380,20 @@ export default function Dashboard() {
     setIsSelfEvalOpen(false);
   };
 
+  const getEvaluationType = (name: string): 'member' | 'director' => {
+    if (!profile) return 'member';
+    if (profile.user_role === 'Membro') {
+      return sectorDirectors.includes(name) ? 'director' : 'member';
+    }
+    if (profile.user_role === 'Gestor') {
+      return gestorDirectors.includes(name) ? 'director' : 'member';
+    }
+    if (profile.user_role === 'Diretor') {
+      return leaderNames.has(name) ? 'director' : 'member';
+    }
+    return 'member';
+  };
+
   const handleSubmitAll = async () => {
     if (!user || !profile) {
       alert("Erro de autenticação. Faça login novamente.");
@@ -272,6 +407,38 @@ export default function Dashboard() {
 
     if (pendingEvaluations.size === 0) {
       alert("Nenhuma avaliação pendente para enviar.");
+      return;
+    }
+
+    const incompleteEvaluations = Array.from(pendingEvaluations.entries()).filter(
+      ([name, data]) => {
+        const type = getEvaluationType(name);
+        const required =
+          type === 'director'
+            ? [
+                data.rating_comunicacao,
+                data.rating_proatividade,
+                data.rating_lideranca,
+                data.rating_flexibilidade,
+              ]
+            : [
+                data.rating_comunicacao,
+                data.rating_proatividade,
+                data.rating_participacao,
+                data.rating_relacao_grupo,
+                data.rating_entrega_metas,
+              ];
+
+        return required.some((value) => !value || value < 1);
+      }
+    );
+
+    if (incompleteEvaluations.length > 0) {
+      alert(
+        `Conclua a avaliação de: ${incompleteEvaluations
+          .map(([name]) => name)
+          .join(', ')} antes de enviar.`
+      );
       return;
     }
 
@@ -289,7 +456,7 @@ export default function Dashboard() {
         .upsert(
           {
             user_id: user.id,
-            week_of: getCycleDate(),
+            week_of: getCycleDateISO(),
             ...pendingSelfEvaluation,
           },
           { onConflict: "user_id,week_of" }
@@ -330,9 +497,7 @@ export default function Dashboard() {
       console.error(error);
     } else {
       if (pendingSelfEvaluation) {
-        setSelfEvalStatus("done");
-        setPendingSelfEvaluation(null);
-        localStorage.removeItem(`pendingSelfEval_${user.id}`);
+        await refreshSelfEvaluations();
       }
 
       alert(
@@ -366,23 +531,52 @@ export default function Dashboard() {
     );
   }
 
-  const currentMembersList = profile.user_role === 'Membro'
-    ? sectorDirectors
-    : (profile.user_role === 'Gestor'
-        ? (viewMode === 'team' ? teamMembers : gestorDirectors)
-        : teamMembers);
+  const selfEvaluationState: 'done' | 'draft' | 'pending' | 'loading' =
+    selfEvalStatus === 'loading'
+      ? 'loading'
+      : selfEvalStatus === 'done'
+        ? 'done'
+        : pendingSelfEvaluation || hasSelfEvalDraft
+          ? 'draft'
+          : 'pending';
 
-  const totalMembersCount = currentMembersList.length;
+  const memberTargetActionTitle = 'Avaliar diretor';
 
-  const evaluatedCount = currentMembersList.filter(
-    (name) => evaluatedInDb.has(name) || pendingEvaluations.has(name)
-  ).length;
+  const memberTargetDescription = `Avalie a liderança e o suporte da diretoria de ${profile.assessoria} neste ciclo.`;
 
-  const pendingCount = Math.max(0, totalMembersCount - evaluatedCount);
+  const teamTargetActionTitle =
+    profile.user_role === 'Diretor'
+      ? 'Avaliar membros'
+      : viewMode === 'director'
+        ? 'Avaliar diretores'
+        : (localProjectName || 'Projeto');
+
+  const teamTargetDescription =
+    profile.user_role === 'Diretor'
+      ? `Avalie o desempenho da equipe de ${profile.assessoria} neste ciclo.`
+      : viewMode === 'director'
+        ? `Avalie a liderança da diretoria de ${profile.assessoria} neste ciclo.`
+        : 'Avalie o desempenho dos membros do seu projeto neste ciclo.';
+
+  const targetCycleStart = getCycleStartDate();
+
+  const targetPeriodLabel = formatCycleRange(targetCycleStart);
+
+  const selfEvaluationPeriodLabel = currentSelfEvaluation
+    ? formatCycleRange(currentSelfEvaluation.week_of)
+    : formatCycleRange(getCycleStartDate());
+
+  const handleSelfEvaluationAction = () => {
+    if (selfEvaluationState === 'done' && currentSelfEvaluation) {
+      setViewedSelfEvaluation(currentSelfEvaluation);
+      return;
+    }
+    setIsSelfEvalOpen(true);
+  };
 
   const getMemberStatus = (name: string): 'evaluated' | 'draft' | 'pending' => {
-    if (pendingEvaluations.has(name)) return 'draft';
     if (evaluatedInDb.has(name)) return 'evaluated';
+    if (pendingEvaluations.has(name)) return 'draft';
     return 'pending';
   };
 
@@ -390,244 +584,249 @@ export default function Dashboard() {
     if (!profile) return [];
 
     if (profile.user_role === 'Membro') {
-      const nomes = [...sectorDirectors];
-      return nomes.map((nome) => ({ nome, evaluationType: 'director' }));
+      return sectorDirectors.map((nome) => ({
+        nome,
+        evaluationType: getEvaluationType(nome),
+      }));
     }
 
     if (profile.user_role === 'Gestor') {
       if (viewMode === 'director') {
-        return gestorDirectors.map((nome) => ({ nome, evaluationType: 'director' }));
+        return gestorDirectors.map((nome) => ({
+          nome,
+          evaluationType: getEvaluationType(nome),
+        }));
       }
-      return teamMembers.map((nome) => ({ nome, evaluationType: 'member' }));
+      return teamMembers.map((nome) => ({
+        nome,
+        evaluationType: getEvaluationType(nome),
+      }));
     }
 
-    return teamMembers.map((nome) => ({ nome, evaluationType: 'member' }));
+    return teamMembers.map((nome) => ({
+      nome,
+      evaluationType: getEvaluationType(nome),
+    }));
   })();
 
-  const reviewItems = reviewTargets.map(({ nome, evaluationType }) => ({
-    nome,
-    evaluationType,
-    data: pendingEvaluations.get(nome) ?? {
-      rating_comunicacao: 0,
-      rating_proatividade: 0,
-      comments: "",
-      ...(evaluationType === 'member'
-        ? {
-            rating_participacao: 0,
-            rating_relacao_grupo: 0,
-            rating_entrega_metas: 0,
-            is_destaque: false,
-          }
-        : {
-            rating_lideranca: 0,
-            rating_flexibilidade: 0,
-            text_delegacao: "Alguns",
-          }),
-    },
-  }));
+  const reviewItems = reviewTargets.flatMap(({ nome, evaluationType }) => {
+    const data = pendingEvaluations.get(nome);
+    return data ? [{ nome, evaluationType, data }] : [];
+  });
+
+  const evaluationCount = reviewTargets.length;
+
+  const selfEvaluationForReview: SelfEvaluationFormData | null =
+    pendingSelfEvaluation ??
+    (currentSelfEvaluation
+      ? {
+          rating_rendimento: currentSelfEvaluation.rating_rendimento,
+          rating_entregas: currentSelfEvaluation.rating_entregas,
+          rating_consistencia: currentSelfEvaluation.rating_consistencia,
+          rating_melhoria: currentSelfEvaluation.rating_melhoria,
+          rating_fatores: currentSelfEvaluation.rating_fatores,
+          comments: currentSelfEvaluation.comments ?? undefined,
+        }
+      : null);
 
   return (
     <div className="min-h-screen bg-azulEscuroPage text-gray-200 relative overflow-x-hidden">
       {/* Glow decorativo de fundo */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-azulClaroCheck/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-laranja/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-2">
+      <div className="max-w-7xl 2xl:max-w-[90rem] mx-auto w-full px-4 sm:px-6 lg:px-8 pt-2">
         <Header 
             nome={profile.notion_name} 
             logout={handleLogout} 
         />
       </div>
 
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-32 flex flex-col gap-10">
+      <main className="max-w-7xl 2xl:max-w-[90rem] mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-32 flex flex-col gap-10">
 
         {/* --- HERO SECTION --- */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        <section className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="flex flex-col justify-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-widest text-azulClaroCheck">Painel de Feedback</span>
-            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Visão Geral</h1>
-            <p className="text-gray-400 max-w-md">
+            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Visão Geral
+            </h1>
+            <p className="max-w-md text-gray-400">
               Acompanhe seus ciclos de avaliação, dê feedback à sua equipe e mantenha o time alinhado com excelência.
             </p>
+            <span className="inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-brand-200">
+              {targetPeriodLabel}
+            </span>
           </div>
 
-          {/* --- AUTOAVALIAÇÃO (botão/badge do ciclo atual) --- */}
-          {selfEvalStatus === 'done' ? (
-            <div className="flex items-center gap-4 px-6 py-5 bg-green-500/10 border border-green-500/30 rounded-2xl text-green-400 font-medium shadow-lg">
-              <span className="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.6)] shrink-0"></span>
+          {selfEvaluationState === 'done' ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-success/30 bg-success/10 px-5 py-4 font-medium text-success shadow-lg">
+              <span className="h-3 w-3 shrink-0 rounded-full bg-success shadow-[0_0_10px_rgba(34,197,94,0.6)]" />
               <div>
-                <p className="text-white font-semibold">Autoavaliação concluída</p>
-                <p className="text-sm text-green-400/80">Você já registrou sua reflexão deste ciclo.</p>
+                <p className="font-semibold text-white">Autoavaliação concluída</p>
+                <p className="text-sm text-success/80">
+                  Você já registrou sua reflexão deste ciclo.
+                </p>
+                {currentSelfEvaluation && (
+                  <button
+                    type="button"
+                    onClick={handleSelfEvaluationAction}
+                    className="mt-2 cursor-pointer text-xs font-semibold text-accent-500 underline-offset-4 transition-colors hover:text-accent-400 hover:underline"
+                  >
+                    Ver autoavaliação
+                  </button>
+                )}
               </div>
             </div>
-          ) : pendingSelfEvaluation ? (
-            <button
-              onClick={() => setIsSelfEvalOpen(true)}
-              className="cursor-pointer flex items-center justify-between gap-4 px-6 py-5 bg-laranja/10 border border-laranja/60 rounded-2xl text-white font-medium hover:border-laranja transition-all shadow-lg group"
-            >
-              <div className="text-left">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-lg font-bold text-white">Autoavaliação preenchida</p>
-                  <span className="text-[11px] font-semibold text-laranja bg-laranja/15 border border-laranja/40 px-2 py-0.5 rounded-full">
-                    Rascunho salvo
-                  </span>
-                </div>
-                <p className="text-sm text-gray-300 group-hover:text-white transition-colors">
-                  Será enviada junto com a avaliação geral. Clique para editar.
-                </p>
-              </div>
-              <FaClipboardCheck className="text-3xl text-laranja shrink-0" />
-            </button>
+          ) : selfEvaluationState === 'loading' ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-gray-400">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+              <p>Verificando autoavaliação...</p>
+            </div>
           ) : (
             <button
-              onClick={() => setIsSelfEvalOpen(true)}
-              className="cursor-pointer flex items-center justify-between gap-4 px-6 py-5 bg-linear-to-br from-azulEscuroCard to-[#001A33] border border-laranja/40 rounded-2xl text-white font-medium hover:border-laranja transition-all shadow-[0_0_20px_rgba(255,102,0,0.2)] hover:shadow-[0_0_30px_rgba(255,102,0,0.35)] group"
+              type="button"
+              onClick={handleSelfEvaluationAction}
+              className="group flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-accent-500/50 bg-accent-500/10 px-5 py-4 text-left font-medium text-white shadow-lg transition-all hover:border-accent-500"
             >
-              <div className="text-left">
-                <p className="text-lg font-bold">Realizar Autoavaliação</p>
-                <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">Reserve um instante para refletir sobre seu ciclo.</p>
+              <div>
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <p className="text-lg font-bold text-white">
+                    {selfEvaluationState === 'draft'
+                      ? 'Autoavaliação preenchida'
+                      : 'Realizar autoavaliação'}
+                  </p>
+                  {selfEvaluationState === 'draft' && (
+                    <span className="rounded-full border border-accent-500/40 bg-accent-500/15 px-2 py-0.5 text-[11px] font-semibold text-accent-500">
+                      Rascunho salvo
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-400 transition-colors group-hover:text-gray-300">
+                  {selfEvaluationState === 'draft' ? (
+                    <>
+                      Será enviada junto com as avaliações.{' '}
+                      <em className="italic">Clique para editar.</em>
+                    </>
+                  ) : (
+                    'Reserve um instante para refletir sobre seu ciclo.'
+                  )}
+                </p>
               </div>
-              <FaClipboardCheck className="text-3xl text-laranja shrink-0" />
+              <FaClipboardCheck className="shrink-0 text-2xl text-accent-500" />
             </button>
           )}
         </section>
 
         {evaluationStatus && (
-            <div className={`animate-fade-in backdrop-blur-md bg-white/5 px-5 py-4 rounded-2xl flex items-center gap-3 font-medium border shadow-lg transition-all ${
-                evaluationStatus === 'up-to-date' 
-                ? 'border-green-500/30 text-green-400' 
-                : 'border-laranja/40 text-laranja'
-            }`}>
-                {evaluationStatus === 'up-to-date' ? (
-                    <FaCheckCircle className="text-xl shrink-0" />
-                ) : (
-                    <FaExclamationTriangle className="text-xl shrink-0" />
-                )}
-                <span>
-                    {evaluationStatus === 'up-to-date' 
-                        ? "Avaliação em dia" 
-                        : (profile.user_role === 'Diretor' 
-                            ? "Avaliação pendente na semana" 
-                            : "Avaliação quinzenal pendente"
-                        )
-                    }
-                </span>
+          <div
+            className={`animate-fade-in mx-auto flex w-fit items-center justify-center gap-2 rounded-2xl border bg-white/5 px-5 py-4 text-center font-medium shadow-lg backdrop-blur-md ${
+              evaluationStatus === 'up-to-date'
+                ? 'border-success/30 text-success'
+                : 'border-accent-500/40 text-accent-500'
+            }`}
+          >
+            <span>
+              {evaluationStatus === 'up-to-date'
+                ? 'Avaliação em dia'
+                : 'Avaliação quinzenal pendente'}
+            </span>
+            {evaluationStatus === 'up-to-date' ? (
+              <FaCheckCircle className="shrink-0 text-xl" />
+            ) : (
+              <FaExclamationTriangle className="shrink-0 text-xl" />
+            )}
+          </div>
+        )}
+
+        {/* --- BOTÃO DE ANALYTICS PARA RH --- */}
+        {profile.assessoria === 'Recursos Humanos' && (
+            <div className="flex justify-center">
+                <button
+                    onClick={() => navigate('/analytics')}
+                    className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-white/15 px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400 hover:text-cyan-300 hover:shadow-lg active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
+                >
+                    Acessar painel de analytics
+                </button>
             </div>
         )}
-        
-        {loadingMembers ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
-                <div className="w-10 h-10 border-2 border-azulClaroCheck border-t-transparent rounded-full animate-spin"></div>
-                <p className="animate-pulse">Buscando dados...</p>
-            </div>
-        ) : (
-            <div className="flex flex-col gap-10">
-                {/* --- BOTÃO DE ANALYTICS PARA RH --- */}
-                {profile.assessoria === 'Recursos Humanos' && (
-                    <div className="flex justify-center">
-                        <button
-                            onClick={() => navigate('/analytics')}
-                            className="flex items-center gap-2 px-6 py-3 bg-[#001A33] border border-azulClaroBorder/50 rounded-lg text-white font-medium hover:bg-azulClaroBorder hover:text-azulEscuroPage transition-all shadow-lg hover:shadow-cyan-500/20 group"
-                        >
-                            <FaChartLine className="text-laranja group-hover:text-azulEscuroPage transition-colors" />
-                            Acessar Painel de Analytics
-                        </button>
-                    </div>
-                )}
 
-                {profile.user_role === 'Membro' ? (
-                    <div className="flex flex-col gap-8">
-                        {/* Linha: Diretor da Assessoria */}
-                        {sectorDirectors.length > 0 ? (
-                            <div className="bg-azulEscuroCard p-6 sm:p-8 rounded-3xl border border-[#001A33] shadow-xl">
-                                <Project
-                                    nome={`Diretor (${profile.assessoria})`}
-                                    membros={sectorDirectors}
-                                    evaluate={setEvaluatingMember}
-                                    submit={handleSubmitAll}
-                                    loading={isSubmitting}
-                                    onReview={() => setIsReviewOpen(true)}
-                                    getMemberStatus={getMemberStatus}
-                                />
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 border-2 border-dashed border-[#001A33] rounded-3xl bg-azulEscuroCard/40 text-center">
-                                <FaUserTie className="text-4xl text-gray-600" />
-                                <p className="text-gray-400">Nenhum diretor encontrado para a assessoria: <strong className="text-gray-300">{profile.assessoria}</strong></p>
-                            </div>
-                        )}
-                    </div>
+        {/* --- BLOCO DE AVALIAÇÕES --- */}
+        <section className="w-full rounded-3xl border border-white/10 bg-azulEscuroCard/80 p-6 shadow-xl backdrop-blur sm:p-8">
+            {loadingMembers ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-10 text-gray-400">
+                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent"></div>
+                    <p className="animate-pulse">Buscando dados...</p>
+                </div>
+            ) : profile.user_role === 'Membro' ? (
+                sectorDirectors.length > 0 ? (
+                    <Project
+                        nome={memberTargetActionTitle}
+                        descricao={memberTargetDescription}
+                        membros={sectorDirectors}
+                        evaluate={setEvaluatingMember}
+                        getMemberStatus={getMemberStatus}
+                    />
                 ) : (
-                    <div className="flex flex-col gap-6">
-                        {/* --- RENDERIZAÇÃO PARA GESTOR E DIRETOR --- */}
-                        {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
-                            <div className="flex justify-center">
-                                <div className="bg-azulEscuroPage p-1.5 rounded-xl inline-flex border border-[#001A33] gap-1">
-                                    <button
-                                        onClick={() => setViewMode('team')}
-                                        className={`cursor-pointer px-6 py-2 rounded-lg font-medium transition-all ${
-                                            viewMode === 'team' 
-                                            ? 'bg-laranja text-white shadow-lg' 
-                                            : 'text-gray-500 hover:text-white'
-                                        }`}
-                                    >
-                                        Avaliar Equipe
-                                    </button>
-                                    <button
-                                        onClick={() => setViewMode('director')}
-                                        className={`cursor-pointer px-6 py-2 rounded-lg font-medium transition-all ${
-                                            viewMode === 'director' 
-                                            ? 'bg-laranja text-white shadow-lg' 
-                                            : 'text-gray-500 hover:text-white'
-                                        }`}
-                                    >
-                                        Avaliar Diretor
-                                    </button>
-                                </div>
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-6 py-10 text-center">
+                        <p className="text-sm text-gray-400">
+                            Nenhum diretor encontrado para a assessoria{' '}
+                            <strong className="font-semibold text-gray-200">
+                                {profile.assessoria}
+                            </strong>.
+                        </p>
+                    </div>
+                )
+            ) : (
+                <div className="flex flex-col gap-6">
+                    {profile.user_role === 'Gestor' && gestorDirectors.length > 0 && (
+                        <div className="flex justify-center">
+                            <div className="inline-flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+                                <button
+                                    onClick={() => setViewMode('team')}
+                                    className={`cursor-pointer rounded-lg px-5 py-2 text-sm font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-95 motion-reduce:transform-none motion-reduce:transition-none ${
+                                        viewMode === 'team'
+                                        ? 'bg-accent-500 text-white shadow'
+                                        : 'text-brand-200 hover:text-white'
+                                    }`}
+                                >
+                                    Equipe
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('director')}
+                                    className={`cursor-pointer rounded-lg px-5 py-2 text-sm font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-95 motion-reduce:transform-none motion-reduce:transition-none ${
+                                        viewMode === 'director'
+                                        ? 'bg-accent-500 text-white shadow'
+                                        : 'text-brand-200 hover:text-white'
+                                    }`}
+                                >
+                                    Diretores
+                                </button>
                             </div>
-                        )}
-
-                        <div className="bg-azulEscuroCard p-6 sm:p-8 rounded-3xl border border-[#001A33] shadow-xl">
-                            <Project
-                                nome={
-                                    profile.user_role === 'Diretor' ? profile.assessoria :
-                                    (viewMode === 'team' ? (localProjectName || "Projeto") : `Diretoria (${profile.assessoria})`)
-                                }
-                                membros={
-                                    profile.user_role === 'Gestor' && viewMode === 'director' 
-                                    ? gestorDirectors 
-                                    : teamMembers
-                                }
-                                evaluate={setEvaluatingMember}
-                                submit={handleSubmitAll}
-                                loading={isSubmitting}
-                                onEditTitle={(profile.user_role === 'Gestor' && viewMode === 'team') ? handleEditProjectName : undefined}
-                                onReview={() => setIsReviewOpen(true)}
-                                getMemberStatus={getMemberStatus}
-                            />
                         </div>
-                        
-                        {teamMembers.length === 0 && (profile.user_role !== 'Gestor' || viewMode === 'team') && (
-                            <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 border-2 border-dashed border-[#001A33] rounded-3xl bg-azulEscuroCard/40 text-center">
-                                <FaUsers className="text-4xl text-gray-600" />
-                                <p className="text-gray-400">Ninguém encontrado nesta categoria.</p>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        )}
+                    )}
 
-        {/* --- RODAPÉ DE STATUS --- */}
-        <div className="flex justify-center pt-4">
-          <StatusEvaluation
-            totalMembers={totalMembersCount}
-            evaluated={evaluatedCount}
-            pending={pendingCount}
-          />
-        </div>
+                    <Project
+                        nome={teamTargetActionTitle}
+                        descricao={teamTargetDescription}
+                        membros={
+                            profile.user_role === 'Gestor' && viewMode === 'director'
+                            ? gestorDirectors
+                            : teamMembers
+                        }
+                        evaluate={setEvaluatingMember}
+                        onEditTitle={(profile.user_role === 'Gestor' && viewMode === 'team') ? handleEditProjectName : undefined}
+                        getMemberStatus={getMemberStatus}
+                    />
+                </div>
+            )}
+
+            <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
+                <Button tipo={1} submit={handleSubmitAll} onReview={() => setIsReviewOpen(true)} count={evaluationCount} />
+                <Button tipo={0} submit={handleSubmitAll} loading={isSubmitting} count={evaluationCount} />
+            </div>
+        </section>
       </main>
 
       {evaluatingMember && (
@@ -636,11 +835,7 @@ export default function Dashboard() {
           initialData={pendingEvaluations.get(evaluatingMember)}
           onClose={() => setEvaluatingMember(null)}
           onSubmit={handleSaveEvaluation}
-          evaluationType={
-            (sectorDirectors.includes(evaluatingMember) || gestorDirectors.includes(evaluatingMember)) 
-             ? 'director' 
-             : 'member'
-          }
+          evaluationType={getEvaluationType(evaluatingMember)}
         />
       )}
 
@@ -648,7 +843,15 @@ export default function Dashboard() {
         isOpen={isReviewOpen}
         onClose={() => setIsReviewOpen(false)}
         items={reviewItems}
-        title="Resumo das avaliações atuais"
+        selfEvaluation={
+          selfEvaluationForReview
+            ? {
+                data: selfEvaluationForReview,
+                periodLabel: selfEvaluationPeriodLabel,
+              }
+            : null
+        }
+        title={evaluationCount === 1 ? "Revisar avaliação do ciclo" : "Revisar avaliações do ciclo"}
       />
 
       {isSelfEvalOpen && (
@@ -657,6 +860,13 @@ export default function Dashboard() {
           initialData={pendingSelfEvaluation ?? undefined}
           onClose={() => setIsSelfEvalOpen(false)}
           onSubmit={handleSaveSelfEvaluation}
+        />
+      )}
+
+      {viewedSelfEvaluation && (
+        <ViewSelfEvaluationModal
+          evaluation={viewedSelfEvaluation}
+          onClose={() => setViewedSelfEvaluation(null)}
         />
       )}
 

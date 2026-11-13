@@ -20,7 +20,7 @@ function evidence(profile: ReminderProfile, hasPeerEvaluation = false, hasSelfEv
   return {
     profile,
     cycle: {
-      type: profile.user_role === 'Membro' ? 'biweekly' : 'weekly',
+      type: 'biweekly',
       key: '2026-08-03',
       startsOn: '2026-08-03',
       endsOn: '2026-08-16',
@@ -60,7 +60,7 @@ describe('runReminderWorker', () => {
     expect(deps.sendEmail).not.toHaveBeenCalled()
   })
 
-  it('agrupa perfis semanais e quinzenais em suas próprias janelas elegíveis', async () => {
+  it('agrupa todos os papéis na mesma janela quinzenal', async () => {
     const director = profile('diretor', 'Diretor')
     const manager = profile('gestor', 'Gestor')
     const member = profile('membro', 'Membro')
@@ -79,21 +79,14 @@ describe('runReminderWorker', () => {
       failed: 0,
     })
 
-    expect(loadEvidence).toHaveBeenCalledTimes(2)
-    expect(loadEvidence).toHaveBeenNthCalledWith(1, {
-      type: 'weekly',
-      key: '2026-08-10',
-      startsOn: '2026-08-10',
-      endsOn: '2026-08-16',
-      reminderOn: '2026-08-14',
-    }, [director, manager])
-    expect(loadEvidence).toHaveBeenNthCalledWith(2, {
+    expect(loadEvidence).toHaveBeenCalledTimes(1)
+    expect(loadEvidence).toHaveBeenCalledWith({
       type: 'biweekly',
       key: '2026-08-03',
       startsOn: '2026-08-03',
       endsOn: '2026-08-16',
       reminderOn: '2026-08-14',
-    }, [member])
+    }, [director, manager, member])
     expect(deps.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ profile: member }))
   })
 
