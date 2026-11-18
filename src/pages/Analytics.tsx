@@ -68,18 +68,18 @@ export default function Analytics() {
   if (!profile) return null;
 
   return (
-    <div className="min-h-screen bg-[#000D1A] text-gray-200 pb-24">
-      <div className="p-8 pt-2 mx-auto max-w-6xl">
+    <div className="min-h-screen bg-azulEscuroPage text-gray-200 pb-24">
+      <div className="mx-auto max-w-7xl p-4 pt-2 sm:p-8 sm:pt-2">
         <Header 
             nome={profile.notion_name} 
             logout={handleLogout} 
         />
 
         <div className="mt-8 mb-8">
-            <h2 className="text-3xl font-bold text-white mb-6">Painel de Feedback <span className="text-[#FF6600]">RH</span></h2>
+            <h2 className="text-3xl font-bold text-white mb-6">Painel de <span className="text-accent-500">RH</span></h2>
             
             {/* Barra de Ferramentas (Busca e Filtros) */}
-            <div className="flex flex-col md:flex-row gap-4 bg-[#001429] p-4 rounded-xl border border-[#001A33] shadow-md">
+            <div className="flex flex-col gap-4 bg-azulEscuroCard p-4 rounded-xl border border-azulClaroBorder/20 shadow-md md:flex-row">
                 
                 {/* Input de Busca */}
                 <div className="flex-1 relative">
@@ -89,18 +89,18 @@ export default function Analytics() {
                         placeholder="Buscar membro por nome..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-[#000D1A] border border-[#001A33] rounded-lg text-white focus:border-[#FF6600] outline-none transition-colors placeholder-gray-600"
+                        className="w-full pl-10 pr-4 py-2 bg-azulEscuroPage border border-azulClaroBorder/20 rounded-lg text-white focus:border-accent-500 outline-none transition-colors placeholder-gray-600"
                     />
                 </div>
 
                 {/* Filtros Dropdown */}
-                <div className="flex gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row">
                     <div className="relative">
                         <FaFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs" />
                         <select 
                             value={filterRole}
                             onChange={(e) => setFilterRole(e.target.value)}
-                            className="pl-8 pr-4 py-2 bg-[#000D1A] border border-[#001A33] rounded-lg text-white focus:border-[#FF6600] outline-none appearance-none cursor-pointer hover:bg-[#001A33] transition-colors"
+                            className="pl-8 pr-4 py-2 bg-azulEscuroPage border border-azulClaroBorder/20 rounded-lg text-white focus:border-accent-500 outline-none appearance-none cursor-pointer hover:bg-white/10 transition-colors"
                         >
                             {roles.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
@@ -111,7 +111,7 @@ export default function Analytics() {
                         <select 
                             value={filterAssessoria}
                             onChange={(e) => setFilterAssessoria(e.target.value)}
-                            className="pl-8 pr-4 py-2 bg-[#000D1A] border border-[#001A33] rounded-lg text-white focus:border-[#FF6600] outline-none appearance-none cursor-pointer hover:bg-[#001A33] transition-colors"
+                            className="pl-8 pr-4 py-2 bg-azulEscuroPage border border-azulClaroBorder/20 rounded-lg text-white focus:border-accent-500 outline-none appearance-none cursor-pointer hover:bg-white/10 transition-colors"
                         >
                             {assessorias.map(a => <option key={a} value={a}>{a}</option>)}
                         </select>

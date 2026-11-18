@@ -1,42 +1,76 @@
-import userIcon from '../../assets/userIcon.svg'
-import { FaCheckCircle } from 'react-icons/fa'
+import ActionButton from "../ui/ActionButton";
+import StatusBadge from "../ui/StatusBadge";
 
 interface UserProps {
-  nome: string
-  pfp?: string 
-  evaluate: () => void
-  status?: 'evaluated' | 'draft' | 'pending'
+  nome: string;
+  pfp?: string;
+  evaluate: () => void;
+  status?: "evaluated" | "draft" | "pending";
 }
 
-export default function Card({ nome, pfp, evaluate, status = 'pending' }: UserProps) {
-  const isEvaluated = status === 'evaluated'
-  const isDraft = status === 'draft'
+const statusContent = {
+  evaluated: {
+    tone: "success" as const,
+    label: "Concluída",
+    hint: "Avaliação enviada",
+    action: "Reavaliar",
+  },
+  draft: {
+    tone: "info" as const,
+    label: "Rascunho salvo",
+    hint: "",
+    action: "Continuar",
+  },
+  pending: {
+    tone: "warning" as const,
+    label: "Pendente",
+    hint: "Aguardando avaliação",
+    action: "Avaliar",
+  },
+};
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+export default function Card({ nome, pfp, evaluate, status = "pending" }: UserProps) {
+  const content = statusContent[status];
 
   return (
-    <div
-      onClick={evaluate}
-      className={`relative select-none flex flex-col w-[150px] h-[130px] gap-1 cursor-pointer hover:scale-105 duration-300 bg-azulEscuroCard justify-center items-center rounded-[6px] border-[1px] transition-colors ${
-        isEvaluated
-          ? 'border-green-500/60 bg-green-500/5'
-          : isDraft
-          ? 'border-laranja/60 bg-laranja/5'
-          : 'border-azulClaroBorder'
-      }`}
-    >
-      {isEvaluated && (
-        <span className="absolute top-1.5 right-1.5 flex items-center gap-1 text-[10px] font-semibold text-green-400 bg-green-950/80 border border-green-500/40 px-1.5 py-0.5 rounded-full">
-          <FaCheckCircle className="text-[9px]" /> Feito
+    <div className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left transition-all hover:border-cyan-500/40 hover:bg-white/[0.07]">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-brand-800 text-sm font-semibold text-cyan-400">
+        {pfp ? (
+          <img src={pfp} alt="" className="h-full w-full object-cover" />
+        ) : (
+          getInitials(nome)
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-white">{nome}</p>
+        {content.hint && (
+          <p className="mt-0.5 text-xs text-gray-400">{content.hint}</p>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-3">
+        <span className="hidden sm:inline-flex">
+          <StatusBadge tone={content.tone}>{content.label}</StatusBadge>
         </span>
-      )}
-      {isDraft && (
-        <span className="absolute top-1.5 right-1.5 text-[10px] font-semibold text-laranja bg-laranja/10 border border-laranja/40 px-1.5 py-0.5 rounded-full">
-          Rascunho
-        </span>
-      )}
-      <img src={pfp || userIcon} alt="Profile Picture" />
-      <p className="font-poppins font-semibold text-[16px] w-[80%] text-center overflow-hidden text-ellipsis whitespace-nowrap">
-        {nome}
-      </p>
+        <ActionButton
+          variant={status === "evaluated" ? "secondary" : "primary"}
+          fullWidth={false}
+          onClick={evaluate}
+        >
+          {content.action}
+        </ActionButton>
+      </div>
     </div>
-  )
+  );
 }

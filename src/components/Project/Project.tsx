@@ -1,88 +1,80 @@
-import { FaPen } from "react-icons/fa";
 import Card from "./Card";
-import Button from "./Button";
+import StatusBadge from "../ui/StatusBadge";
 
 interface ProjectProps {
   nome?: string;
+  descricao?: string;
   membros: string[];
   evaluate: (value: string | null) => void;
-  submit: () => void;
-  loading?: boolean;
   onEditTitle?: () => void;
-  onReview?: () => void;
-  getMemberStatus?: (memberName: string) => 'evaluated' | 'draft' | 'pending';
+  getMemberStatus?: (memberName: string) => "evaluated" | "draft" | "pending";
 }
 
 export default function Project({
   nome,
+  descricao,
   membros,
   evaluate,
-  submit,
-  loading = false,
   onEditTitle,
-  onReview,
   getMemberStatus,
 }: ProjectProps) {
-  
+  const total = membros.length;
+  const drafts = getMemberStatus
+    ? membros.filter((membro) => getMemberStatus(membro) === "draft").length
+    : 0;
+
   return (
-    <div className="flex flex-col font-poppins text-white w-full gap-6 pt-6 animate-fade-in">
-      
-      {/* Cabeçalho da Seção */}
-      <div className="flex items-center justify-between border-b border-[#001A33] pb-3">
-        <div className="flex items-center gap-3 group">
-          <h2 className="text-2xl font-bold text-white tracking-wide">
-            {nome || "Equipe"}
-          </h2> 
-          {onEditTitle && (
-            <button 
-              onClick={onEditTitle}
-              className="text-gray-500 hover:text-laranja transition-colors text-lg opacity-0 group-hover:opacity-100 p-2 rounded-full hover:bg-white/5"
-              title="Alterar nome do projeto"
-            >
-              <FaPen />
-            </button>
-          )}
+    <div className="flex w-full animate-fade-in flex-col gap-5 font-poppins text-white">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-2xl font-bold tracking-tight text-white">
+              {nome || "Equipe"}
+            </h2>
+            {onEditTitle && (
+              <button
+                type="button"
+                onClick={onEditTitle}
+                className="cursor-pointer text-xs font-medium text-cyan-400 underline-offset-4 transition-colors hover:text-cyan-300 hover:underline"
+              >
+                Editar nome
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge tone="neutral">
+              {total} {total === 1 ? "pessoa" : "pessoas"}
+            </StatusBadge>
+            {drafts > 0 && (
+              <StatusBadge tone="info">{drafts} com rascunho salvo</StatusBadge>
+            )}
+          </div>
         </div>
-        
-        {/* Badge de Contagem */}
-        <span className="bg-[#001A33] text-azulClaroCheck text-sm font-semibold px-3 py-1 rounded-full border border-azulClaroBorder/30">
-          {membros.length} {membros.length === 1 ? 'membro' : 'membros'}
-        </span>
+
+        {descricao && (
+          <p className="max-w-2xl text-sm text-gray-400">{descricao}</p>
+        )}
       </div>
 
-      {/* Grid de Cards (Substituindo o Carrossel) */}
-      {membros.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 w-full">
-          {membros.map((membroNome, idx) => (
-            <div key={idx} className="w-full flex justify-center sm:justify-start">
-              {/* O componente Card precisará ter largura 100% no arquivo dele para preencher o grid */}
-              <Card
-                nome={membroNome}
-                evaluate={() => evaluate(membroNome)}
-                status={getMemberStatus ? getMemberStatus(membroNome) : 'pending'}
-              />
-            </div>
+      {total > 0 ? (
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          {membros.map((membroNome) => (
+            <Card
+              key={membroNome}
+              nome={membroNome}
+              evaluate={() => evaluate(membroNome)}
+              status={getMemberStatus ? getMemberStatus(membroNome) : "pending"}
+            />
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-[#001A33] rounded-2xl bg-azulEscuroPage/50">
-          <span className="text-4xl mb-3">👻</span>
-          <p className="text-gray-400 text-center">Ninguém para avaliar nesta seção.</p>
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-6 py-10 text-center">
+          <p className="text-sm text-gray-400">
+            Ninguém para avaliar nesta seção.
+          </p>
         </div>
       )}
-
-      {/* Ações (Botões de Envio e Revisão) */}
-      {membros.length > 0 && (
-        <div className="flex flex-col sm:flex-row gap-4 mt-4 pt-6 border-t border-[#001A33] w-full justify-end">
-          <div className="w-full sm:w-auto">
-            <Button tipo={1} submit={submit} onReview={onReview} /> 
-          </div>
-          <div className="w-full sm:w-auto">
-            <Button tipo={0} submit={submit} loading={loading} />
-          </div>
-        </div>
-      )}
-      
     </div>
   );
 }

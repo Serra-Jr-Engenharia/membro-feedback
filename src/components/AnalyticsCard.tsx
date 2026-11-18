@@ -23,9 +23,9 @@ const StatBar = ({ label, value }: { label: string; value: number }) => (
       <span>{label}</span>
       <span className="font-bold text-white">{value}</span>
     </div>
-    <div className="w-full bg-[#000D1A] h-2 rounded-full overflow-hidden">
-      <div 
-        className="h-full bg-gradient-to-r from-blue-500 to-[#FF6600]" 
+    <div className="w-full bg-azulEscuroPage h-2 rounded-full overflow-hidden">
+      <div
+        className="h-full bg-gradient-to-r from-blue-500 to-accent-500"
         style={{ width: `${(value / 5) * 100}%` }}
       />
     </div>
@@ -34,15 +34,15 @@ const StatBar = ({ label, value }: { label: string; value: number }) => (
 
 export default function AnalyticsCard({ data }: { data: AnalyticsData }) {
   return (
-    <div className="bg-[#001429] border border-[#001A33] rounded-xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-      
+    <div className="bg-azulEscuroCard border border-azulClaroBorder/20 rounded-xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+
       {/* Cabeçalho do Card */}
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-xl font-bold text-white mb-1">{data.member_name}</h3>
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <span className="flex items-center gap-1">
-              <FaUserTie className="text-[#FF6600]" /> {data.user_role}
+              <FaUserTie className="text-accent-500" /> {data.user_role}
             </span>
             <span>•</span>
             <span className="text-gray-300">{data.assessoria}</span>
@@ -53,10 +53,10 @@ export default function AnalyticsCard({ data }: { data: AnalyticsData }) {
             </div>
           )}
         </div>
-        
+
         {/* Nota Principal (Destaque) */}
-        <div className="flex flex-col items-center bg-[#000D1A] p-2 rounded-lg border border-[#001A33]">
-          <span className="text-2xl font-bold text-[#FF6600]">{data.overall_score}</span>
+        <div className="flex flex-col items-center bg-azulEscuroPage p-2 rounded-lg border border-azulClaroBorder/20">
+          <span className="text-2xl font-bold text-accent-500">{data.overall_score}</span>
           <div className="flex text-yellow-400 text-xs">
             <FaStar />
           </div>
@@ -64,13 +64,13 @@ export default function AnalyticsCard({ data }: { data: AnalyticsData }) {
         </div>
       </div>
 
-      <hr className="border-[#001A33] mb-4" />
+      <hr className="border-azulClaroBorder/20 mb-4" />
 
       {/* Estatísticas Detalhadas */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         <StatBar label="Comunicação" value={data.avg_comunicacao} />
         <StatBar label="Proatividade" value={data.avg_proatividade} />
-        
+
         {/* Mostra métricas de membro se tiverem valor > 0 */}
         {data.avg_participacao > 0 && <StatBar label="Participação" value={data.avg_participacao} />}
         {data.avg_relacao > 0 && <StatBar label="Relação" value={data.avg_relacao} />}

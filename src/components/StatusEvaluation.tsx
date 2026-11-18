@@ -1,87 +1,91 @@
-import { useState } from "react";
-import userIcon from "../assets/userIcon.svg";
-import Check from "../assets/check.svg";
-import Clock from "../assets/clock.svg";
+import type { ReactNode } from "react";
+import ActionButton from "./ui/ActionButton";
+import StatusBadge, { type StatusTone } from "./ui/StatusBadge";
 
-interface CircleProps {
-  number?: number;
-  icon?: number;
+export type SelfEvaluationState = "done" | "draft" | "pending" | "loading";
+
+export interface SelfEvaluationInfo {
+  state: SelfEvaluationState;
+  detailLabel?: string;
+  actionLabel: string;
+  onAction: () => void;
+  disabled?: boolean;
 }
 
-interface MembersProps {
-  totalMembers: number;
-  evaluated: number;
-  pending: number;
+interface StatusEvaluationProps {
+  cycleLabel: string;
+  selfEvaluation: SelfEvaluationInfo;
+  children?: ReactNode;
+  footer?: ReactNode;
 }
 
-function Circle({ number, icon }: CircleProps) {
-  let iconChoosed;
-
-  if (icon === 0) {
-    iconChoosed = userIcon;
-  } else if (icon === 1) {
-    iconChoosed = Check;
-  } else {
-    iconChoosed = Clock;
-  }
-
-  return (
-    <div className="relative flex w-[100px] h-[100px] bg-azulEscuroCard rounded-full border-azulClaroBorder border-2 justify-center items-center">
-      <h1 className="text-2xl font-semibold text-white">{number}</h1>
-      <div className="absolute flex justify-center items-center right-0 -top-2.5 bg-azulEscuroCard w-12 h-12 rounded-full">
-        <img width={36} height={36} src={iconChoosed} />
-      </div>
-    </div>
-  );
-}
+const selfEvaluationTone: Record<
+  SelfEvaluationState,
+  { tone: StatusTone; label: string }
+> = {
+  done: { tone: "success", label: "Concluída" },
+  draft: { tone: "info", label: "Rascunho salvo" },
+  pending: { tone: "warning", label: "Pendente" },
+  loading: { tone: "neutral", label: "Verificando..." },
+};
 
 export default function StatusEvaluation({
-  totalMembers,
-  evaluated,
-  pending,
-}: MembersProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  cycleLabel,
+  selfEvaluation,
+  children,
+  footer,
+}: StatusEvaluationProps) {
+  const tone = selfEvaluationTone[selfEvaluation.state];
+  const canAct = !selfEvaluation.disabled;
 
   return (
-    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 mb-2 z-40">
-      <div className="bg-azulEscuroCard/95 border border-azulClaroBorder rounded-t-2xl shadow-xl px-4 pt-2 pb-3 min-w-[320px]">
-        <button
-          type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between gap-3 text-sm text-gray-200 cursor-pointer"
-        >
-          <div className="flex flex-col text-left">
-            <span className="font-semibold text-white">
-              Status das avaliações
-            </span>
-            <span className="text-xs text-gray-300">
-              {evaluated}/{totalMembers} avaliados •{" "}
-              <span
-                className={`text-xs ${
-                  pending > 0 ? `text-laranja` : `text-gray-300`
-                } `}
-              >
-                {pending} pendentes
-              </span>
-            </span>
-          </div>
-          <span
-            className={`text-lg transition-transform ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          >
-            ▲
-          </span>
-        </button>
-
-        {isOpen && (
-          <div className="mt-4 flex gap-4 justify-center">
-            <Circle number={totalMembers} icon={0} />
-            <Circle number={evaluated} icon={1} />
-            <Circle number={pending} icon={2} />
-          </div>
-        )}
+    <section
+      aria-label="Status das avaliações"
+      className="w-full rounded-3xl border border-white/10 bg-azulEscuroCard/80 p-6 shadow-xl backdrop-blur sm:p-8"
+    >
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-semibold uppercase tracking-widest text-cyan-400">
+          Resumo do ciclo
+        </span>
+        <h2 className="text-xl font-bold text-white">Ciclo atual</h2>
+        <p className="text-sm text-brand-200">{cycleLabel}</p>
       </div>
-    </div>
+
+      {children && <div className="mt-5">{children}</div>}
+
+      <div className={children ? "mt-6 border-t border-white/10 pt-5" : "mt-5"}>
+        <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-semibold text-white">
+                Autoavaliação
+              </h3>
+              <StatusBadge tone={tone.tone}>{tone.label}</StatusBadge>
+            </div>
+            {selfEvaluation.detailLabel && (
+              <p className="text-xs text-gray-400">
+                {selfEvaluation.detailLabel}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 sm:items-end">
+            <ActionButton
+              variant={selfEvaluation.state === "done" ? "secondary" : "primary"}
+              onClick={selfEvaluation.onAction}
+              disabled={!canAct}
+            >
+              {selfEvaluation.actionLabel}
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+
+      {footer && (
+        <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
+          {footer}
+        </div>
+      )}
+    </section>
   );
 }
