@@ -1,4 +1,4 @@
-import { FaStar, FaUserTie, FaProjectDiagram } from "react-icons/fa";
+import { FaStar, FaArrowRight } from "react-icons/fa";
 
 export interface AnalyticsData {
   profile_id: string;
@@ -17,15 +17,25 @@ export interface AnalyticsData {
   avg_flexibilidade: number;
 }
 
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
 const StatBar = ({ label, value }: { label: string; value: number }) => (
-  <div className="flex flex-col gap-1 w-full">
+  <div className="flex w-full flex-col gap-1">
     <div className="flex justify-between text-xs text-gray-400">
       <span>{label}</span>
       <span className="font-bold text-white">{value}</span>
     </div>
-    <div className="w-full bg-azulEscuroPage h-2 rounded-full overflow-hidden">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
       <div
-        className="h-full bg-gradient-to-r from-blue-500 to-accent-500"
+        className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-accent-500 transition-all duration-500"
         style={{ width: `${(value / 5) * 100}%` }}
       />
     </div>
@@ -34,51 +44,59 @@ const StatBar = ({ label, value }: { label: string; value: number }) => (
 
 export default function AnalyticsCard({ data }: { data: AnalyticsData }) {
   return (
-    <div className="bg-azulEscuroCard border border-azulClaroBorder/20 rounded-xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-
-      {/* Cabeçalho do Card */}
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="text-xl font-bold text-white mb-1">{data.member_name}</h3>
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <span className="flex items-center gap-1">
-              <FaUserTie className="text-accent-500" /> {data.user_role}
-            </span>
-            <span>•</span>
-            <span className="text-gray-300">{data.assessoria}</span>
-          </div>
-          {data.project_name && (
-            <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-              <FaProjectDiagram /> {data.project_name}
+    <div className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-azulEscuroCard/80 p-6 shadow-lg backdrop-blur transition-all duration-200 hover:-translate-y-1 hover:border-accent-500/40 hover:shadow-xl">
+      <div className="flex flex-col gap-4">
+        {/* Cabeçalho do Card */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-brand-800 text-sm font-semibold text-cyan-400">
+              {getInitials(data.member_name)}
             </div>
-          )}
+            <div className="flex flex-col gap-1.5">
+              <h3 className="text-lg font-bold leading-tight text-white">{data.member_name}</h3>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-brand-200">
+                  {data.user_role}
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-brand-200">
+                  {data.assessoria}
+                </span>
+                {data.project_name && (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-brand-200">
+                    {data.project_name}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Nota Principal (Destaque) */}
+          <div className="flex shrink-0 flex-col items-center gap-0.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-center">
+            <span className="text-2xl font-bold text-accent-500">{data.overall_score}</span>
+            <FaStar className="text-xs text-accent-500/70" />
+            <span className="text-[10px] whitespace-nowrap text-gray-400">{data.total_evaluations} avaliações</span>
+          </div>
         </div>
 
-        {/* Nota Principal (Destaque) */}
-        <div className="flex flex-col items-center bg-azulEscuroPage p-2 rounded-lg border border-azulClaroBorder/20">
-          <span className="text-2xl font-bold text-accent-500">{data.overall_score}</span>
-          <div className="flex text-yellow-400 text-xs">
-            <FaStar />
-          </div>
-          <span className="text-[10px] text-gray-500 mt-1">{data.total_evaluations} avaliações</span>
+        {/* Estatísticas Detalhadas */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-white/10 pt-4">
+          <StatBar label="Comunicação" value={data.avg_comunicacao} />
+          <StatBar label="Proatividade" value={data.avg_proatividade} />
+
+          {/* Mostra métricas de membro se tiverem valor > 0 */}
+          {data.avg_participacao > 0 && <StatBar label="Participação" value={data.avg_participacao} />}
+          {data.avg_relacao > 0 && <StatBar label="Relação" value={data.avg_relacao} />}
+          {data.avg_metas > 0 && <StatBar label="Metas" value={data.avg_metas} />}
+
+          {/* Mostra métricas de líder se tiverem valor > 0 */}
+          {data.avg_lideranca > 0 && <StatBar label="Liderança" value={data.avg_lideranca} />}
+          {data.avg_flexibilidade > 0 && <StatBar label="Flexibilidade" value={data.avg_flexibilidade} />}
         </div>
       </div>
 
-      <hr className="border-azulClaroBorder/20 mb-4" />
-
-      {/* Estatísticas Detalhadas */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        <StatBar label="Comunicação" value={data.avg_comunicacao} />
-        <StatBar label="Proatividade" value={data.avg_proatividade} />
-
-        {/* Mostra métricas de membro se tiverem valor > 0 */}
-        {data.avg_participacao > 0 && <StatBar label="Participação" value={data.avg_participacao} />}
-        {data.avg_relacao > 0 && <StatBar label="Relação" value={data.avg_relacao} />}
-        {data.avg_metas > 0 && <StatBar label="Metas" value={data.avg_metas} />}
-
-        {/* Mostra métricas de líder se tiverem valor > 0 */}
-        {data.avg_lideranca > 0 && <StatBar label="Liderança" value={data.avg_lideranca} />}
-        {data.avg_flexibilidade > 0 && <StatBar label="Flexibilidade" value={data.avg_flexibilidade} />}
+      {/* Rodapé */}
+      <div className="mt-5 flex items-center justify-end gap-1.5 border-t border-white/10 pt-3 text-xs font-semibold text-gray-400 transition-colors group-hover:text-accent-500">
+        Ver histórico completo <FaArrowRight size={10} />
       </div>
     </div>
   );
